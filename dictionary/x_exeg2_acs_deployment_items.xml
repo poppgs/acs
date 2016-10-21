@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<database>
+    <element label="Deployment Items" max_length="40" name="x_exeg2_acs_deployment_items" type="collection">
+        <element label="Deployment" max_length="32" name="deployment" reference="x_exeg2_acs_deployment" type="reference"/>
+        <element label="Name" max_length="40" name="name" type="string"/>
+        <element label="Type" max_length="40" name="type" type="string"/>
+        <element label="Value" max_length="2048" name="value" type="string"/>
+        <index name="index">
+            <element name="deployment"/>
+        </index>
+    </element>
+</database>

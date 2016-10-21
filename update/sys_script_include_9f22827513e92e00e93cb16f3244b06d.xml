@@ -1,0 +1,502 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update table="sys_script_include">
+    <sys_script_include action="INSERT_OR_UPDATE">
+        <access>package_private</access>
+        <active>true</active>
+        <api_name>x_exeg2_acs.ACSHighLevelHelper</api_name>
+        <client_callable>false</client_callable>
+        <description>Helper scripts for the high level apis and business rules</description>
+        <name>ACSHighLevelHelper</name>
+        <script><![CDATA[var ACSHighLevelHelper = Class.create();
+
+ACSHighLevelHelper.prototype = {
+    /**
+     * Constructor, sets up the member variables.
+     */
+    type: 'ACSHighLevelHelper', // Constant
+    initialize: function()
+    {
+    },
+
+
+    /********************************************************************
+      Calculate all the related firmware versions to the software item passed
+      in (by name)
+      INPUT:
+        name - Name of the package
+        version - The version of the package (no build, no firmware)
+      OUTPUT:
+        function - returns object containing release objects keyed by 
+                   firmware version. Each object contains an 
+                   array of 'appliances' and a reference to the
+                   installed piece of 'software' (feed handler)
+    *********************************************************************/
+    gather_fw_versions: function(name, version)
+    {
+        var versions = [];  // Init return object
+
+        var gl = new GlideRecord("cmdb_ci_spkg");
+        gl.addQuery("name", name);
+        gl.addQuery("version", 'CONTAINS', '/'+version);
+        gl.query();
+
+        while(gl.next())
+        {
+            try
+            {
+                var full_version = gl.version.toString();
+                
+                if(full_version.indexOf('/') !== -1)
+                {
+                    var firmware_version = full_version.split('/')[0];
+                    
+                    // Don't support 3.1.x
+                    if(firmware_version != '3.1' && firmware_version.indexOf('3.1.') !== 0)
+                    {   
+                        // This is the correct version for the package we are
+                        // deploying
+                        if(versions.indexOf(firmware_version) === -1)
+                        {
+                            versions.push(firmware_version);
+                        }
+                    }
+                }
+            }
+            catch (err)
+            {
+                gs.addErrorMessage("Error caught:\n"+err);
+            }
+        }
+    
+        return versions;
+    },
+
+
+    /**
+     * Get the ACS configuration that holds items like how many changes we can
+     * schedule on one day.
+     */
+    get_scheduling_config: function()
+    {
+        // TODO:
+        //   This configuration is going to be driven by data that does not yet
+        //   exist in Service Now. There are going to be company-specific items 
+        //   as well as global items. Right now just return the structure, but
+        //   in the future will need to be aggregated from these new sources.
+        var config = {
+            day_in_ms: (24 * 60 * 60 * 1000), // Doesn't really need to live in the config, but it is convienient
+            dev_appliance_day_offset: 5,      // Number of days that should be between an identical change on a dev/test/UAT appliance and it's primary pair
+            primary_backup_day_offset: 2,     // Number of days that should be between an identical change on a primary and backup appliance pair
+            max_acs_changes_per_day: 20,      // Max number of changes that can be placed on a single day TODO: What should this value be?
+            same_day_ms_threshold: (1000 * 60 * 60 * 23) // 23 hours. How many ms a change must be away from another to be considered on a different "day"
+        };
+
+        return config;
+    },
+
+
+    /**
+     * Helper function to get the last character of an appliance name and
+     * return it. This will help us determine if it is a primary/backup etc.
+     * Function will probably not be needed in the future
+     * @param {string} name - The name of the appliance
+     */
+    get_appliance_names_last_character: function(name)
+    {
+        var to_check = name;
+        if(to_check.indexOf('-') != -1)
+        {
+            to_check = to_check.split('-')[0];
+        }
+  
+        return to_check[to_check.length - 1];
+    },
+
+
+    /**
+     * Helper function to get the appliances name before the last char to help
+     * determine what "grouping" the appliance is a part of.
+     * Function will probably not be needed in the future
+     * @param {string} name - The name of the appliance
+     */
+    get_appliance_names_grouping: function(name)
+    {
+        var to_check = name;
+        if(to_check.indexOf('-') != -1)
+        {
+            to_check = to_check.split('-')[0];
+        }
+  
+        return to_check.slice(0, -1);
+    },
+
+
+    /**
+     * Retrieves a list of appliances from Service (Exegy) Now and returns
+     * it
+     * @param {array} target_appliances - A list of appliance legacy names to
+     *                                    limit the appliance query. If the
+     *                                    array is empty don't limit the query.
+     */
+    get_appliances: function(target_appliances)
+    {
+        var appliances = [];
+
+        var appliance_query = new GlideRecord("x_exeg2_cmdb_appliance");
+        appliance_query.addQuery('operational_status', 1);
+        // Limit the appliances received to xtp and mds appliance types
+        // TODO: We may need to remove this limitation in the future:
+        appliance_query.addQuery('u_appliance_type', 'IN', '7aea980e4fc592004b8658211310c7da,3eea980e4fc592004b8658211310c7d9');
+        
+        if(target_appliances && String(target_appliances) != '')
+        {
+            appliance_query.addQuery('u_legacy_name', 'IN', target_appliances);
+        }
+
+        // Run the query
+        appliance_query.query();
+  
+        // Loop through the results
+        while(appliance_query.next())
+        {
+            var a = {};
+            a.name = String(appliance_query.u_legacy_name);
+            a.sys_id = String(appliance_query.sys_id);
+            a.company = String(appliance_query.company.getDisplayValue());
+            a.location = String(appliance_query.location.getDisplayValue());
+            a.firmware_version = String(appliance_query.u_firmware_version);
+            a.u_exegy_deployment = String(appliance_query.u_exegy_deployment.getDisplayValue());
+            a.operational_status = parseInt(appliance_query.operational_status);
+            a.change_dependencies = [];
+  
+            appliances.push(a);
+        }
+
+        // Next query the Appliance Change Dependencies table to determine
+        // what appliances need to come before what other appliances
+        var acd_query = new GlideRecord("x_exeg2_acs_appliance_change_dependencies");
+
+        // Run the query
+        acd_query.query();
+  
+        // Loop through the results
+        var undefined_records = 0;
+        while(acd_query.next())
+        {
+            var appliance_name = String(acd_query.appliance.u_legacy_name);
+            var data = { name: String(acd_query.dependency_appliance.u_legacy_name), day_gap: parseInt(acd_query.day_gap) };
+
+            for(var i = 0; i < appliances.length; i++)
+            {
+                if(appliances[i].name == appliance_name)
+                {
+                    appliances[i].change_dependencies.push(data);
+                    break;
+                }
+            }
+        }
+  
+        return appliances;
+    },
+
+
+    /**
+     * Retrieve all the schedules that are associated with at least one
+     * appliance from Service Now
+     */
+    get_all_schedules: function()
+    {
+        var schedules = [];
+        var sys_ids_seen = [];
+
+        // By querying this table we are only going to retrieve schedules that
+        // are associated with appliances
+        var appliance_schedule_query = new GlideRecord("x_exeg2_acs_appliances_to_schedules");
+
+        // Run the query
+        appliance_schedule_query.query();
+  
+        // Loop through the results
+        while(appliance_schedule_query.next())
+        {
+            var sys_id = appliance_schedule_query.schedule.toString();
+
+            if(sys_ids_seen.indexOf(sys_id) === -1)
+            {
+                var s = {};
+                s.sys_id = sys_id;
+                s.type = appliance_schedule_query.type.toString();
+                s.name = appliance_schedule_query.schedule.name.getDisplayValue();
+                s.timezone = appliance_schedule_query.schedule.timezone;
+                s.got_entries = false; // We will mark this as true if/when we
+                                       // retireve the entries for this schedule
+
+                schedules.push(s);
+            }
+        }
+
+        return schedules;
+    },
+
+
+    /**
+     * Given a schedule's sys ID retrieve all the schedule entries that are
+     * associated with that schedule and return them
+     */
+    get_schedules_entries: function(schedule_sys_id)
+    {
+        var entries = [];
+
+        var entries_query = new GlideRecord("cmn_schedule_span");
+        entries_query.addQuery('schedule', schedule_sys_id);
+
+        // Run the query
+        entries_query.query();
+
+        // Loop through the results
+        while(entries_query.next())
+        {
+            var e = {};
+            e.name = entries_query.name.getDisplayValue();
+            e.sys_id = String(entries_query.sys_id);
+            e.all_day = entries_query.all_day.getDisplayValue();
+            e.days_of_week = entries_query.days_of_week.getDisplayValue();
+            e.end_date_time = entries_query.end_date_time.getDisplayValue();
+            e.float_day = entries_query.float_day.getDisplayValue();
+            e.float_week = entries_query.float_week.getDisplayValue();
+            e.month = entries_query.month.getDisplayValue();
+            e.monthly_type = entries_query.monthly_type.getDisplayValue();
+            e.repeat_count = entries_query.repeat_count.getDisplayValue();
+            e.repeat_type = entries_query.repeat_type.getDisplayValue();
+            e.repeat_until = entries_query.repeat_until.getDisplayValue();
+            e.start_date_time = entries_query.start_date_time.getDisplayValue();
+            e.type = entries_query.type.getDisplayValue();
+            e.yearly_type = entries_query.yearly_type.getDisplayValue();
+
+            entries.push(e);
+        }
+
+        return entries;
+    },
+
+
+    /**
+     * Given an appliance's sys ID and an array of all the schedules that we
+     * know about, return a list of the scheudle objects (a subset of
+     * "all_schedules") that are associated with the appliance
+     * @param {string} appliance_sys_id - The sys ID of the appliance for
+     *                                    which to retrieve the schedules
+     * @param {array} all_schedules - The array of schedules that have already
+     *                                been retrieved from Service Now. Do it
+     *                                this way so we don't have to grab this
+     *                                list from Service Now every time we want
+     *                                to figure out an appliance's schedules
+     */
+    get_appliances_schedules: function(appliance_sys_id, all_schedules)
+    {
+        var schedule_sys_ids = [];
+
+        var appliance_schedule_query = new GlideRecord("x_exeg2_acs_appliances_to_schedules");
+        appliance_schedule_query.addQuery('appliance', appliance_sys_id);
+
+        // Run the query
+        appliance_schedule_query.query();
+  
+        // Loop through the results
+        while(appliance_schedule_query.next())
+        {
+            schedule_sys_ids.push(appliance_schedule_query.schedule.toString());
+        }
+
+        // Compile a list of the schedule objects that apply to this appliance
+        var schedules = [];
+        for(var i = 0; i < schedule_sys_ids.length; i++)
+        {
+            // Find the schedule object
+            for(var j = 0; j < all_schedules.length; j++)
+            {
+                if(all_schedules[j].sys_id == schedule_sys_ids[i])
+                {
+                    // This is it
+                    // Make sure we have this schedule's entries before
+                    // continuing
+                    if(!all_schedules[j].got_entries)
+                    {
+                        // Retrieve the entries for this schedule
+                        // Doing things this way allows us to reuse objects
+                        // and limit Service Now queries
+                        all_schedules[j].entries = this.get_schedules_entries(schedule_sys_ids[i]);
+                        all_schedules[j].got_entries = true;
+                    }
+                    
+                    schedules.push(all_schedules[j]);
+                    break;
+                }
+            }
+        }
+
+        return schedules;
+    },
+
+
+    /**
+     * Get all the records from the feed handler instances table and return
+     * them
+     */
+    get_feedhandler_instances: function()
+    {
+        var feedhandler_instances = [];
+        var fh_query = new GlideRecord("u_feed_handler_instance");
+  
+        fh_query.query();
+  
+        while(fh_query.next())
+        {
+            // Copy all relevant fields out of the fh instance entry
+            var fh = {};
+            fh.name = String(fh_query.u_name.getDisplayValue());
+            fh.sys_id = String(fh_query.sys_id);
+            fh.appliance = String(fh_query.u_appliance.getDisplayValue());
+            fh.installed_on = String(fh_query.u_installed_on.getDisplayValue());
+  
+            feedhandler_instances.push(fh);
+        }
+  
+        return feedhandler_instances;
+    },
+
+
+    /**
+     * Given an array of change sys_ids retreive those changes and create
+     * ACSChangeInstances for each one
+     * @param {array} change_sys_ids - The array of change sys ids for which
+     *                                 to get changes
+     */
+    get_changes_by_sys_ids: function(change_sys_ids)
+    {
+        var changes = [];
+  
+        var change_query = new GlideRecord("change_request");
+        change_query.addQuery("sys_id", 'IN', change_sys_ids.join(','));
+  
+        // Run the query
+        change_query.query();
+  
+        // Loop through the results
+        while(change_query.next())
+        {
+            var change_instance = new ACSChangeInstance();
+            change_instance.rescheduling = true;
+            change_instance.from_glide_record(change_query);
+
+            changes.push(change_instance);
+        }
+
+        return changes;
+    },
+    
+
+    /**
+     * Get all the records from the init lib instances table and store them
+     */
+    get_init_lib_instances: function()
+    {
+        var init_lib_instances = [];
+        var init_lib_query = new GlideRecord("u_init_lib_instance");
+  
+        init_lib_query.query();
+  
+        while(init_lib_query.next())
+        {
+            // Copy all relevant fields out of the init lib instance entry
+            var il = {};
+            il.name = String(init_lib_query.u_name.getDisplayValue());
+            il.sys_id = String(init_lib_query.sys_id);
+            il.appliance = String(init_lib_query.u_appliance.getDisplayValue());
+            il.installed_on = String(init_lib_query.u_installed_on.getDisplayValue());
+  
+            init_lib_instances.push(il);
+        }
+  
+        return init_lib_instances;
+    },
+    
+
+    /**
+     * Retrieve a single ACS Deployment record from service now. Query by the
+     * sys ID.
+     */
+    get_acs_deployment: function(deployment_sys_id)
+    {
+        var deployment = null;
+        var deployment_query = new GlideRecord("x_exeg2_acs_deployment");
+  
+        deployment_query.addQuery('sys_id', deployment_sys_id);
+
+        deployment_query.query();
+  
+        while(deployment_query.next())
+        {
+            // Copy all relevant fields out of the deployment query
+            deployment = {};
+            deployment.name = String(deployment_query.name);
+            deployment.number = String(deployment_query.number);
+            deployment.version = String(deployment_query.version);
+            deployment.hot_cut = Boolean(deployment_query.hot_cut);
+            deployment.category = String(deployment_query.category);
+            deployment.deadline = String(deployment_query.deadline);
+            deployment.start_date = String(deployment_query.start_date);
+            deployment.release_type = String(deployment_query.release_type);
+            deployment.security_update = Boolean(deployment_query.security_update);
+            deployment.target_appliances = String(deployment_query.target_appliances);
+        }
+  
+        return deployment;
+    },
+    
+
+    /**
+     * Given an ACS Deployment sys ID, retrieve all the deployment
+     * items that are related to it.
+     */
+    get_acs_deployment_items: function(deployment_sys_id)
+    {
+        var deployment_items = [];
+        var deployment_item_query = new GlideRecord("x_exeg2_acs_deployment_items");
+  
+        deployment_item_query.addQuery('deployment', deployment_sys_id);
+
+        deployment_item_query.query();
+  
+        while(deployment_item_query.next())
+        {
+            // Copy all relevant fields out of the deployment instance query
+            deployment_item = {};
+            deployment_item.type = String(deployment_item_query.type);
+            deployment_item.name = String(deployment_item_query.name);
+            deployment_item.value = String(deployment_item_query.value);
+            deployment_item.sys_id = String(deployment_item_query.sys_id);
+            deployment_item.deployment_instance = String(deployment_item_query.deployment_instance);            
+
+            deployment_items.push(deployment_item);
+        }
+  
+        return deployment_items;
+    }
+};]]></script>
+        <sys_class_name>sys_script_include</sys_class_name>
+        <sys_created_by>mcarter</sys_created_by>
+        <sys_created_on>2016-08-30 19:47:05</sys_created_on>
+        <sys_customer_update>true</sys_customer_update>
+        <sys_id>9f22827513e92e00e93cb16f3244b06d</sys_id>
+        <sys_mod_count>48</sys_mod_count>
+        <sys_name>ACSHighLevelHelper</sys_name>
+        <sys_package display_value="ACS" source="x_exeg2_acs">58d89c1c13fca200e93cb16f3244b0d7</sys_package>
+        <sys_policy>read</sys_policy>
+        <sys_replace_on_upgrade>false</sys_replace_on_upgrade>
+        <sys_scope display_value="ACS">58d89c1c13fca200e93cb16f3244b0d7</sys_scope>
+        <sys_update_name>sys_script_include_9f22827513e92e00e93cb16f3244b06d</sys_update_name>
+        <sys_updated_by>mcarter</sys_updated_by>
+        <sys_updated_on>2016-10-20 20:36:31</sys_updated_on>
+    </sys_script_include>
+</record_update>

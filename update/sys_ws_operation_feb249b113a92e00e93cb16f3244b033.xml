@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update table="sys_ws_operation">
+    <sys_ws_operation action="INSERT_OR_UPDATE">
+        <active>true</active>
+        <consumes>application/json,application/xml,text/xml</consumes>
+        <consumes_customized>false</consumes_customized>
+        <default_operation_uri/>
+        <enforce_acl/>
+        <http_method>POST</http_method>
+        <name>reschedule</name>
+        <operation_script><![CDATA[(function process(/*RESTAPIRequest*/ request, /*RESTAPIResponse*/ response)
+{
+    response = { success: true, status: '', change_ids: [] };
+    var i = 0;
+    var j = 0;
+
+    // Get the parameters passed in
+    var split = null;
+    var params = request.body.data;
+    var change_sys_ids = params.changes.split(',');
+    var hot_cut = params.hot_cut;
+    if(String(hot_cut).toLowerCase() == 'false')
+    {
+        hot_cut = false;
+    }
+    var start_date = params.start_date;
+    if(start_date.indexOf('/') != -1)
+    {
+        // Different date format, reformat before continuing
+        split = start_date.split('/');
+        start_date = split[2] +'-'+ split[0] +'-'+ split[1];
+    }
+
+    var deadline = null;
+    if(params.deadline)
+    {
+        deadline = params.deadline;
+        if(deadline.indexOf('/') != -1)
+        {
+            // Different date format, reformat before continuing
+            split = deadline.split('/');
+            deadline = split[2] +'-'+ split[0] +'-'+ split[1];
+        }
+    }
+
+    // gs.info('Reschedule called:\nstart_date: '+start_date+'\ndeadline: '+deadline+'\nhot_cut: '+hot_cut);
+
+    // Create a logger
+    var logger = new ACSLogger();
+    logger.set_source('Rescheduling');
+
+    // Get access to all the helper functions:
+    var helper = new ACSHighLevelHelper();
+
+    // Get the scheduling configuration
+    var scheduling_config = helper.get_scheduling_config();
+
+    // Get all the appliance data we need
+    var all_appliances = helper.get_appliances();
+
+    // Get the changes the user requested to reschedule
+    var change_instanes_to_reschedule = helper.get_changes_by_sys_ids(change_sys_ids);
+
+    // Make sure we have all the data we need for rescheduling
+    for(i = 0; i < change_instanes_to_reschedule.length; i++)
+    {
+        // Find the appliance this change targets
+        for(j = 0; j < all_appliances.length; j++)
+        {
+            if(change_instanes_to_reschedule[i].appliance_name == all_appliances[j].name)
+            {
+                // Assign the appliance
+                change_instanes_to_reschedule[i].appliance = all_appliances[j];
+                break;
+            }
+        }
+
+        // Create a faux deployment object for the change instance
+        change_instanes_to_reschedule[i].deployment = { start_date: start_date,
+                                                        deadline: deadline,
+                                                        hot_cut: hot_cut,
+                                                        scheduling_config: scheduling_config };
+
+        // Clear out the "selected day" so we can pick a new one
+        change_instanes_to_reschedule[i].selected_day = false;
+    }
+
+    // We need to get all the other changes we need to schedule around, and
+    // then throw out the ones we are rescheduling from this array
+    var existing_changes = [];
+
+    var cr_query = new GlideRecord("change_request");
+    cr_query.addQuery("state", 'IN', '1,2,11,12,13');
+    cr_query.query();
+
+    while(cr_query.next())
+    {
+        // Because of our query filters we know this is a change that has not
+        // yet been implemented/executed
+        // Create a new change instance object and add it to our array:
+        var change_instance = new ACSChangeInstance();
+        change_instance.from_glide_record(cr_query);
+
+        // If this is a change we are rescheduling already we don't need to
+        // add it to our array
+        var add = true;
+        for(i = 0; i < change_instanes_to_reschedule.length; i++)
+        {
+            if(change_instanes_to_reschedule[i].number == change_instance.number)
+            {
+                add = false;
+                break;
+            }
+        }
+
+        if(add)
+        {
+            existing_changes.push(change_instance);
+        }
+    }
+
+    // We now have an array of change instances to reschedule, and an array of
+    // changes to schedule around. Reschedule!
+    // Create a scheduler object
+    var scheduler = new ACSScheduler();
+
+    // Use the scheduler object to schedule the changes!
+    response.change_ids = scheduler.schedule_changes(change_instanes_to_reschedule, existing_changes, false);
+
+    // Set a text status in the response
+    response.status = change_instanes_to_reschedule.length+' changes rescheduled!';
+
+    // Return what happened
+    response.rescheduling_response = [];
+    for(var a = 0; a < change_instanes_to_reschedule.length; a++)
+    {
+        var rr = {};
+        rr.appliance = change_instanes_to_reschedule[a].appliance_name;
+        rr.change_number = change_instanes_to_reschedule[a].number;
+        rr.start_date = change_instanes_to_reschedule[a].selected_day;
+
+        // Format date and time
+        var year = rr.start_date.getFullYear();
+        var month = rr.start_date.getMonth() + 1;
+        if(month < 10) { month = '0'+month; }
+        var day = rr.start_date.getDate();
+        if(day < 10) { day = '0'+day; }
+
+        rr.start_date = year +'-'+ month +'-'+ day;
+
+        response.rescheduling_response.push(rr);
+    }
+    
+    return response;
+})(request, response);]]></operation_script>
+        <operation_uri>/api/x_exeg2_acs/acs_reschedule</operation_uri>
+        <produces>application/json,application/xml,text/xml</produces>
+        <produces_customized>false</produces_customized>
+        <relative_path>/</relative_path>
+        <request_example/>
+        <requires_acl_authorization>false</requires_acl_authorization>
+        <requires_authentication>true</requires_authentication>
+        <short_description/>
+        <sys_class_name>sys_ws_operation</sys_class_name>
+        <sys_created_by>mcarter</sys_created_by>
+        <sys_created_on>2016-08-30 14:52:05</sys_created_on>
+        <sys_customer_update>true</sys_customer_update>
+        <sys_id>feb249b113a92e00e93cb16f3244b033</sys_id>
+        <sys_mod_count>43</sys_mod_count>
+        <sys_name>reschedule</sys_name>
+        <sys_package display_value="ACS" source="x_exeg2_acs">58d89c1c13fca200e93cb16f3244b0d7</sys_package>
+        <sys_policy/>
+        <sys_replace_on_upgrade>false</sys_replace_on_upgrade>
+        <sys_scope display_value="ACS">58d89c1c13fca200e93cb16f3244b0d7</sys_scope>
+        <sys_update_name>sys_ws_operation_feb249b113a92e00e93cb16f3244b033</sys_update_name>
+        <sys_updated_by>mcarter</sys_updated_by>
+        <sys_updated_on>2016-10-18 14:08:11</sys_updated_on>
+        <web_service_definition display_value="acs_reschedule">342a7cfd13692e00e93cb16f3244b08b</web_service_definition>
+        <web_service_version/>
+    </sys_ws_operation>
+</record_update>

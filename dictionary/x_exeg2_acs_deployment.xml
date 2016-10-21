@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<database>
+    <element label="Deployment" max_length="40" name="x_exeg2_acs_deployment" type="collection">
+        <element label="Deployment Category" max_length="64" name="category" type="string"/>
+        <element label="Deadline" max_length="40" name="deadline" type="due_date"/>
+        <element label="Hot Cut" max_length="40" name="hot_cut" type="boolean"/>
+        <element label="Name" max_length="40" name="name" type="string"/>
+        <element default="javascript:global.getNextObjNumberPadded();" display="true" label="Number" max_length="40" name="number" type="string"/>
+        <element label="Security Update" max_length="40" name="security_update" type="boolean"/>
+        <element label="Start Date" max_length="40" name="start_date" type="due_date"/>
+        <element label="Target Appliances" max_length="2048" name="target_appliances" type="string"/>
+        <element label="Version" max_length="40" name="version" type="string"/>
+    </element>
+</database>

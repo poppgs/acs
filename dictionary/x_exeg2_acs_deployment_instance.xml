@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<database>
+    <element label="Deployment Instance" max_length="40" name="x_exeg2_acs_deployment_instance" type="collection">
+        <element label="Firmware Version" max_length="20" name="firmware_version" type="string"/>
+        <element display="true" label="Parent" max_length="32" name="parent" reference="x_exeg2_acs_deployment" type="reference"/>
+        <element label="Software" max_length="32" name="sw" reference="cmdb_ci_spkg" type="reference"/>
+        <index name="index">
+            <element name="parent"/>
+        </index>
+        <index name="index2">
+            <element name="sw"/>
+        </index>
+    </element>
+</database>

@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update table="sys_script_include">
+    <sys_script_include action="INSERT_OR_UPDATE">
+        <access>package_private</access>
+        <active>true</active>
+        <api_name>x_exeg2_acs.ACSScheduler</api_name>
+        <client_callable>false</client_callable>
+        <description>Class that handles scheduling changes!</description>
+        <name>ACSScheduler</name>
+        <script><![CDATA[var ACSScheduler = Class.create();
+
+ACSScheduler.prototype = {
+    /**
+     * Constructor, sets up the member variables.
+     */
+    type: 'ACSScheduler',                 // Constant
+    initialize: function() {
+        this.logger = new ACSLogger();
+        this.logger.set_source('ACSScheduler');
+
+        this.deployment_category_to_template_id = {
+            'Feed Handler': '4cca50014f91aa008ea450ee0310c71c',
+            'Firmware': '1655cbfc138e2640e93cb16f3244b0aa'
+        };
+    },
+
+
+    /**
+     * Given an array of changes sort the array by the number of possible
+     * days for the change
+     * @param {array} changes - The array of change instances to sort
+     */
+    sort_changes_by_possible_days: function(changes)
+    {
+        function compare(a,b)
+        {
+            if (a.possible_days.length < b.possible_days.length)
+            {
+                return -1;
+            }
+            if (a.possible_days.length > b.possible_days.length)
+            {
+                return 1;
+            }
+            return 0;
+        }
+
+        changes.sort(compare);
+    },
+
+
+    /**
+     * Take in changes to schedule and other changes to schedule around (that
+     * are already scheduled) and schedule them!
+     * @param {array} changes_to_schedule - Array of ChangeInstances to find
+     *                                      times to schedule.
+     * @param {array} existing_changes - Changes that already exist that we
+     *                                   need to schedule around.
+     * @param {mixed} deployment_category - Software category of the changes
+     *                                    being scheduled, used to figure out
+     *                                    what template to use for filling out
+     *                                    the change requests.
+     *                                    If we are rescheduling this will be
+     *                                    false, as we can be rescheduling
+     *                                    many different categories of
+     *                                    changes/upgrades. In this case we
+     *                                    will execute a slightly different
+     *                                    code path at the end of this
+     *                                    function.
+     */
+    schedule_changes: function(changes_to_schedule, existing_changes, deployment_category)
+    {
+        var i = 0;
+        var j = 0;
+
+        // Create an ACSRules object that will represent all the scheduling
+        // rules used to calculate possible days for a change.
+        var rules = new ACSRules();
+
+        // Get access to the helper scripts:
+        var helper = new ACSHighLevelHelper();
+
+        // Get a list of all the schedules we need to be aware of
+        var all_schedules = helper.get_all_schedules();
+
+        // For each of the change instances to schedule, find the referenced 
+        // appliance's schedules, so we have a place to start as far as
+        // scheduling goes
+        for(i = 0; i < changes_to_schedule.length; i++)
+        {
+            var schedules = helper.get_appliances_schedules(changes_to_schedule[i].appliance.sys_id, all_schedules);
+
+            if(changes_to_schedule[i].deployment.hot_cut)
+            {
+                // We only need our maintenance schedules
+                changes_to_schedule[i].appliance.schedules = [];
+                for(j = 0; j < schedules.length; j++)
+                {
+                    if(schedules[j].type == 'maintenance')
+                    {
+                        changes_to_schedule[i].appliance.schedules.push(schedules[j]);
+                    }
+                }
+            }
+            else
+            {
+                // Take all the schedules!
+                changes_to_schedule[i].appliance.schedules = schedules;
+            }
+        }
+
+        // For each of the change instances to schedule determine what
+        // possbile times it can be scheduled for execution
+        for(i = 0; i < changes_to_schedule.length; i++)
+        {
+            changes_to_schedule[i].find_possible_days(changes_to_schedule, existing_changes, rules);
+        }
+        
+        // Sort the change instances based on how many possible days they have
+        // available (changes with only 1 possible day will be at the front [0]
+        // of the list)
+        var sorted_change_instances = changes_to_schedule.concat(); // Shallow array copy
+        this.sort_changes_by_possible_days(sorted_change_instances);
+
+        // Start scheduling changes
+        while(sorted_change_instances.length > 0)
+        {
+            // Keep track of the index of the change instance we are currently
+            // scheduling. We default to the first change instance in the
+            // sorted array, which should be the change instance with the
+            // least amount of possible days.
+            var current_index = 0;
+
+            // Check this change instance's appliance to see if it has any
+            // systems that must have this change executed before it, that
+            // have not yet been scheduled.
+            // If that is the case change our current_index to point at that
+            // appliance's change instance so we can be sure it is scheduled
+            // first.
+            // We may have to do this multiple times, for multiple
+            // dependencies
+            var check = true;
+            while(check)
+            {
+                // We might be done checking, but we are NOT done checking
+                // if any appliance in the current's dependency list has
+                // not yet been scheduled
+                var changed_index = false;
+                for(i = 0; i < sorted_change_instances[current_index].appliance.change_dependencies.length; i++)
+                {
+                    var cd = sorted_change_instances[current_index].appliance.change_dependencies[i];
+
+                    // See if we can find the dependency appliance in any
+                    // other not-yet-scheduled change
+                    for(var j = 0; j < sorted_change_instances.length; j++)
+                    {
+                        if(sorted_change_instances[j].appliance.name == cd.name)
+                        {
+                            // We need to schedule the change instance at index j first
+                            changed_index = true;
+                            current_index = j;
+                            break;
+                        }
+                    }
+
+                    if(changed_index)
+                    {
+                        break;
+                    }
+                }
+
+                // If we changed the index that means we found another
+                // change instance that needs to be scheduled prior to
+                // the one we were looking at. Now we need to check THAT
+                // change instance's appliance dependencies to make sure
+                // we don't need to do this whole process again.
+                check = changed_index;
+            }
+
+            // Refernce the change instance we are going to schedule
+            current = sorted_change_instances[current_index];
+
+            // Pick a day to schedule the current change from the changes
+            //  possible days list. This will also affect the copy of the
+            //  change instance in the changes_to_schedule list, because the
+            //  sorted change instances are just references to that list in a
+            //  different order. This means this will be updated "everywhere"
+            // Pick the earliest day possible
+            if(current.possible_days.length > 0)
+            {
+                current.selected_day = current.possible_days[0];
+            }
+            else
+            {
+                // This is an error condition, we could not schedule
+                // the change
+                var msg = "Release.create_and_schedule_changes: Could not schedule a change! ";
+                // msg += " fwver="+this.firmware_version;
+                // msg += " name="+this.name;              
+                this.logger.log('ERROR', msg);
+                // TODO: Do more stuff here, like alert and file incidents
+                // We have now (probably) scheduled the change. We need to
+                //       or something
+            }
+
+            // Remove the change we just scheduled from the sorted list
+            // because we don't need to pick a date for it anymore
+            sorted_change_instances.splice(current_index, 1);
+
+            // Check the remaining change instances we need to schedule to see
+            // if we can find any other instances that target the same
+            // deployment (appliance's deployment).
+            // All deployments must be scheduled on the same day, so if we
+            // find any we can just automatically schedule them on the same
+            // day we just scheduled the previous change instance
+            var current_appliance_deployment = current.appliance.u_exegy_deployment;
+            var splice_indexes = [];
+            for(i = 0; i < sorted_change_instances.length; i++)
+            {
+                if(sorted_change_instances[i].appliance.u_exegy_deployment ===
+                   current_appliance_deployment)
+                {
+                    // Same deployment, must be scheduled on the same day
+                    sorted_change_instances[i].selected_day = current.selected_day;
+                    splice_indexes.push(i);
+                }
+            }
+
+            // Remove any changes from the list that we just scheduled due to
+            // matching appliance deployments
+            splice_indexes.reverse();
+            for(var s = 0; s < splice_indexes.length; s++)
+            {
+                sorted_change_instances.splice(splice_indexes[s], 1);
+            }
+
+            //  re-compute the possible days for the remaining changes, and
+            //  then re-sort
+            if(sorted_change_instances.length > 0)
+            {
+                for(i = 0; i < sorted_change_instances.length; i++)
+                {
+                    sorted_change_instances[i].find_possible_days(changes_to_schedule, existing_changes, rules);
+                }
+
+                this.sort_changes_by_possible_days(sorted_change_instances);
+            }
+        }
+
+        // Keep track of the scheduled change IDs
+        var scheduled_change_ids = [];
+
+        // If deployment_category is not a string, and is false, that means we
+        // are rescheduling. If it is a string that means we need to template
+        // out brand new changes.
+        if(deployment_category)
+        {
+            // Create a templater object that will help fill in the contents of
+            // our changes
+            var templater = new ACSTemplater();
+            var template_id = this.deployment_category_to_template_id[deployment_category];
+
+            // Add the newly scheduled change instances to SNOW
+            for(i = 0; i < changes_to_schedule.length; i++)
+            {
+                scheduled_change_ids.push(changes_to_schedule[i].add_to_snow(templater, template_id));
+            }
+        }
+        else
+        {
+            // Rescheduling!            
+            for(i = 0; i < changes_to_schedule.length; i++)
+            {
+                scheduled_change_ids.push(changes_to_schedule[i].reschedule());
+            }
+        }
+
+        return scheduled_change_ids;
+    }
+};]]></script>
+        <sys_class_name>sys_script_include</sys_class_name>
+        <sys_created_by>mcarter</sys_created_by>
+        <sys_created_on>2016-09-13 20:41:37</sys_created_on>
+        <sys_customer_update>true</sys_customer_update>
+        <sys_id>0f1a1a961331a240e93cb16f3244b023</sys_id>
+        <sys_mod_count>20</sys_mod_count>
+        <sys_name>ACSScheduler</sys_name>
+        <sys_package display_value="ACS" source="x_exeg2_acs">58d89c1c13fca200e93cb16f3244b0d7</sys_package>
+        <sys_policy>read</sys_policy>
+        <sys_replace_on_upgrade>false</sys_replace_on_upgrade>
+        <sys_scope display_value="ACS">58d89c1c13fca200e93cb16f3244b0d7</sys_scope>
+        <sys_update_name>sys_script_include_0f1a1a961331a240e93cb16f3244b023</sys_update_name>
+        <sys_updated_by>mcarter</sys_updated_by>
+        <sys_updated_on>2016-10-20 20:51:22</sys_updated_on>
+    </sys_script_include>
+</record_update>

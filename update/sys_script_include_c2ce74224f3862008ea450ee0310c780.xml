@@ -1,0 +1,446 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update table="sys_script_include">
+    <sys_script_include action="INSERT_OR_UPDATE">
+        <access>package_private</access>
+        <active>true</active>
+        <api_name>x_exeg2_acs.ACSRules</api_name>
+        <client_callable>false</client_callable>
+        <description>Models all the scheduling rules that apply to each CR that gets created by the automatic change scheduler. </description>
+        <name>ACSRules</name>
+        <script><![CDATA[var ACSRules = Class.create();
+
+ACSRules.prototype = {
+    /**
+     * Constructor, sets up the member variables.
+     */
+    type: 'ACSRules',                 // Constant
+    initialize: function() {
+        this.logger = new ACSLogger();
+        this.logger.set_source('ACSRules');
+    },
+
+
+    /**
+     * Helper function (not a rule)
+     * Get the ms difference between two dates
+     * @param {Date} date_a - The first date
+     * @param {Date} date_b - The second date
+     */
+    get_date_ms_difference: function(date_a, date_b)
+    {
+        var ms_difference = date_a - date_b;
+        return Math.abs(ms_difference);
+    },
+
+    
+    /**
+     * Make sure that identical changes are not executed on appliances before
+     * their dependency appliances have the change scheduled/executed first.
+     * This takes care of the following cases:
+     *  Doing a change on the dev/test/UAT before the primary
+     *  Doing a change on the primary before the backup
+     * Satisfies the following requirements:
+     * AC-CHS-REQ-1
+     *  A change that must be performed on both appliances in a redundancy
+     *  group (e.g. primary and backup) shall not be scheduled during the same
+     *  change window.
+     * AC-CHS-REQ-2
+     *  A change that must be performed on both appliances in a redundancy
+     *  group (e.g. primary and backup) shall be scheduled such that there is
+     *  at least 2 market days between the execution dates of the change on the
+     *  primary and backup appliances.
+     * AC-CHS-REQ-17
+     *  ACS shall schedule changes on UAT/Dev/Test appliances at least 5 market days prior to changes on the primary appliance
+     * AC-CHS-REQ-17.1
+     *  Customers may optionally specify a different period than specified in AC-
+     *  CHS-REQ-17, with a minimum of 2 and a maximum of 15 market days.
+     * AC-CHS-REQ-2.1
+     *  Customers may optionally specify a longer period than specified in AC-
+     *  CHS-REQ-2, with a maximum of 5 market days.
+     * @param {object} target_change - The ACSChangeInstance we need to apply
+     *                                 the rules to
+     * @param {Date} possible_day - The day for target change to check the
+     *                              rule for
+     * @param {array} other_new_changes - (see "apply_rules" function comment)
+     * @param {array} other_existing_changes - (see "apply_rules" function
+     *                                         comment)
+     * @param {ACSRules} self - The rules object that called this function
+     *                           ("this" doesn't work with the way we are
+     *                            calling these functions)
+     */
+    appliance_dependency_offset_rule: function(target_change, possible_day, other_new_changes, other_existing_changes, self)
+    {
+        var pass = true;
+        var s_config = target_change.deployment.scheduling_config;
+
+        // If this is a hot cut deployment we don't need to apply this rule
+        if(target_change.deployment.hot_cut) { return pass; }
+        
+
+        // The target change's appliance object will have an array of
+        // appliances associated with it that need to be scheduled first.
+        // Each element in that array will also have how many days should be
+        // between that appliance and the target change's appliance.
+        for(var i = 0; (i < target_change.appliance.change_dependencies.length && pass); i++)
+        {
+            var dependency_name = target_change.appliance.change_dependencies[i].name;
+            var dependency_gap  = target_change.appliance.change_dependencies[i].day_gap;
+
+            // See if we can find this appliance in the other new changes
+            //  This rule only applies to changes on identical deployments
+            //  so we don't need to check the "other_existing_changes" array
+            // TODO: Now, with rescheduling, I think we will have to check the
+            //        other existing changes and compare the change instance's
+            //        acs ref
+            for(var j = 0; (j < other_new_changes.length && pass); j++)
+            {
+                if(other_new_changes[j].appliance.name == dependency_name)
+                {
+                    // This is the dependency change
+                    if(other_new_changes[j].selected_day)
+                    {
+                        var ms_threshold = (dependency_gap * s_config.day_in_ms) + (3600000); // Add another hour to make this work properly
+
+                        // Check the provided possible day for the
+                        // target_change to see if we respect the dependency's
+                        // day gap
+                        if(possible_day < other_new_changes[j].selected_day)
+                        {
+                            // This possible day comes before the selected
+                            // day for the dependency appliance, which is
+                            // incorrect
+                            pass = false;
+                        }
+                        else
+                        {
+                            var ms_difference = self.get_date_ms_difference(other_new_changes[j].selected_day, possible_day);
+                            if(ms_difference < ms_threshold)
+                            {
+                                // This possible day is after the
+                                // dependency appliance's change, but is
+                                // still too close to it
+                                pass = false;
+                            }
+                        }
+
+                    }
+                    break;
+                }
+            }
+        }
+
+        return pass;
+    },
+
+
+    /**
+     * Make sure that any day a primary appliance has a change going on that
+     * the backup appliance doesn't have any change scheduled that day (and
+     * vice versa). The only exception to this is when the target change is a
+     * hot cut (then we have no other choice).
+     * AC-CHS-REQ-3
+     *  The ACS should ensure that changes are not scheduled for both appliances
+     *  in a redundancy group (e.g. primary and backup) during the same change
+     *  window.
+     * AC-CHS-REQ-3.1
+     *  The ACS shall allow exceptions to AC-CHS-REQ-3 when required (e.g. hot
+     *  cut). Exceptions must be reported and approved by executive
+     *  management at both the customer and Exegy.
+     * @param {object} target_change - The ACSChangeInstance we need to apply
+     *                                 the rules to
+     * @param {Date} possible_day - The day for target change to check the
+     *                              rule for
+     * @param {array} other_new_changes - (see "apply_rules" function comment)
+     * @param {array} other_existing_changes - (see "apply_rules" function
+     *                                         comment)
+     * @param {ACSRules} self - The rules object that called this function
+     *                           ("this" doesn't work with the way we are
+     *                            calling these functions)
+     */
+    primary_backup_same_day_rule: function(target_change, possible_day, other_new_changes, other_existing_changes, self)
+    {
+        var s_config = target_change.deployment.scheduling_config;
+        var pass = true;
+
+        // If this is a hot cut deployment we don't need to apply this rule
+        if(target_change.deployment.hot_cut) { return pass; }
+
+        // TODO: Right now just going to look at last character in the name
+        // of the appliance. We know that a/b systems should be primary/backup.
+        // If our last character is not a or b, just return.
+        // This should probably be looking at a different field in the
+        // appliance data to determine this.
+        var last_char = String(target_change.appliance.name[target_change.appliance.name.length - 1]).toLowerCase();
+        if(last_char != 'a' && last_char != 'b') { return pass; }
+
+        var rest_of_name = String(target_change.appliance.name).slice(0, -1);
+
+        // Calculate the ms threshold. aka how many ms any change must be
+        // scheduled away from it's appliance pair
+        var ms_threshold = s_config.same_day_ms_threshold;
+
+        var i = 0;
+
+        // See if any changes that are on the same day as a possible day have
+        // our primary/backup pair appliance as the target appliance.
+        // First the other new changes
+        for(i = 0; i < other_new_changes.length; i++)
+        {
+            // If this change doesn't have a day picked yet we can just move
+            // on to the next index
+            if(!other_new_changes[i].selected_day)
+            {
+                continue;
+            }
+
+            // Check to see if the other change's appliance is in our pair
+            if(other_new_changes[i].appliance.name.indexOf(rest_of_name) === 0 &&
+               other_new_changes[i].appliance.name != target_change.appliance.name)
+            {
+                // This is another appliance in our "group", see what the last
+                // character on the appliance is
+                var other_last_char = String(other_new_changes[i].appliance.name[other_new_changes[i].appliance.name.length - 1]).toLowerCase();
+                if((other_last_char == 'a' || other_last_char == 'b')
+                    && other_last_char != last_char)
+                {
+                    // This is our redundancy pair appliance
+                    // Check the possible day for the target change to see if
+                    // it is within the range for this rule
+                    var ms_difference = self.get_date_ms_difference(other_new_changes[i].selected_day, possible_day);
+                    if(ms_difference < ms_threshold)
+                    {
+                        // Changes are too close together
+                        pass = false;
+                    }
+
+                    // Since there is ever only one primary-backup pair we are
+                    // done looping
+                    // TODO: Is this really true?
+                    break;
+                }
+            }
+        }
+        // Now the other existing changes
+        for(i = 0; (i < other_existing_changes.length && pass); i++)
+        {
+            if(!other_existing_changes[i].appliance)
+            {
+                // Possible if we picked up like template changes or
+                // something in our query
+                continue;
+            }
+
+            // Check to see if the other change's appliance is in our pair
+            if(other_existing_changes[i].appliance.name.indexOf(rest_of_name) === 0 &&
+               other_existing_changes[i].appliance.name != target_change.appliance.name)
+            {
+                // This is another appliance in our "group", see what the last
+                // character on the appliance is
+                var other_last_char = String(other_existing_changes[i].appliance.name[other_existing_changes[i].appliance.name.length - 1]).toLowerCase();
+                if((other_last_char == 'a' || other_last_char == 'b')
+                    && other_last_char != last_char)
+                {
+                    // This is our redundancy pair appliance
+                    // Check the possible day for the target change to see if
+                    // it is within the range for this rule
+                    var ms_difference = self.get_date_ms_difference(other_existing_changes[i].selected_day, possible_day);
+                    if(ms_difference < ms_threshold)
+                    {
+                        // Changes are too close together
+                        pass = false;
+                    }
+
+                    // Since there is ever only one primary-backup pair we are
+                    // done looping
+                    // TODO: Is this really true?
+                    break;
+                }
+            }
+        }
+
+        return pass;
+    },
+
+
+    /**
+     * Make sure we dont schedule too many changes on the same day
+     * @param {object} target_change - The ACSChangeInstance we need to apply
+     *                                 the rules to
+     * @param {Date} possible_day - The day for target change to check the
+     *                              rule for
+     * @param {array} other_new_changes - (see "apply_rules" function comment)
+     * @param {array} other_existing_changes - (see "apply_rules" function
+     *                                         comment)
+     * @param {ACSRules} self - The rules object that called this function
+     *                           ("this" doesn't work with the way we are
+     *                            calling these functions)
+     */
+    max_changes_per_day_rule: function(target_change, possible_day, other_new_changes, other_existing_changes, self)
+    {
+        var pass = true;
+        var j = 0;
+        var s_config = target_change.deployment.scheduling_config;
+
+        // If there are too many changes scheduled on the provided possible
+        // day then remove then this rule does not pass
+        // We are going to check a threshold of ms. So if two changes are
+        // within this many ms of each other they are considered to be on
+        // the same "day"
+        var ms_threshold = s_config.same_day_ms_threshold;
+        var max_changes = s_config.max_acs_changes_per_day;
+
+        var this_day_change_count = 0;
+
+        // Other new changes within the same deployment
+        for(j = 0; j < other_new_changes.length; j++)
+        {
+            // If we have not selected a day yet for this change skip it
+            if(!other_new_changes[j].selected_day)
+            {
+                continue;
+            }
+
+            var difference = self.get_date_ms_difference(other_new_changes[j].selected_day, possible_day);
+
+            if(difference < ms_threshold)
+            {
+                // Same day!
+                this_day_change_count++;
+                if(this_day_change_count >= max_changes)
+                {
+                    pass = false;
+                    break;
+                }
+            }
+        }
+
+        if(pass)
+        {
+            // ACS changes that have been scheduled prior to this deployment
+            for(j = 0; j < other_existing_changes.length; j++)
+            {
+                var difference = self.get_date_ms_difference(other_existing_changes[j].selected_day, possible_day);
+                if(difference < ms_threshold)
+                {
+                    // Same day!
+                    this_day_change_count++;
+                    if(this_day_change_count >= max_changes)
+                    {
+                        pass = false;
+                        break;
+                    }
+                }
+            }
+        }
+
+        return pass;
+    },
+
+
+    /**
+     * Applies all scheduling rules (from the all_rules array) to the
+     * target_change in order to accurately schedule it
+     * @param {object} target_change - The change to apply the scheduling
+     *                                 rules to
+     * @param {array} other_new_changes - Other new changes that are being
+     *                                    scheduling alongside the target
+     *                                    change. These changes may not have
+     *                                    a selected date yet, and in this
+     *                                    case be mostly ignored.
+     * @param {array} other_existing_changes - Other ACS changes that already
+     *                                         existed prior to the
+     *                                         deployment/change instance we
+     *                                         are scheduling for. These will
+     *                                         always have a selected date and
+     *                                         will need to be scheduled around
+     */
+    apply_rules: function(target_change, other_new_changes, other_existing_changes)
+    {
+        // Create an array of every rule. These are the rules that will then
+        // be executed in the following block of code
+        var all_rules = [ this.primary_backup_same_day_rule,
+                          this.appliance_dependency_offset_rule,
+                          this.max_changes_per_day_rule ];
+
+        // Keep track of what days we need to remove from the possible days
+        // array for the target change.
+        var splice_indexs = [];
+        var msg = "";
+        // Loop through every possible day in the target_change
+        // NOTE: In the rule functions I used to loop through the possible
+        //       days there, which was more performant. However, if we make
+        //       the rule functions take a single date along with the change
+        //       it gives us more flexibility in the future for things like
+        //       rescheduling and determining what rules are broken for a
+        //       particular day.
+        for(var i = 0; i < target_change.possible_days.length; i++)
+        {
+            // Apply every rule to this possible day to see if they pass or
+            // fail
+            for(var j = 0; j < all_rules.length; j++)
+            {
+                // Call the rule function
+                var pass = all_rules[j](target_change, target_change.possible_days[i], other_new_changes, other_existing_changes, this);
+                if(!pass)
+                {
+                    // This particular rule didn't pass, so we can't use this
+                    // possible day
+                    // If we have a deadline and this is the last possible day
+                    // do not remove it, just flag that we can't schedule it
+                    // any other time.
+                    if(i == (target_change.possible_days.length - 1) &&
+                       target_change.deployment.deadline &&
+                       target_change.deployment.hot_cut)
+                    {
+                        // This is the last possible day
+                        //  We have a deadline
+                        //  The deployment is a hot cut
+                        //  Can't remove it
+                        this.logger.log('WARNING', "Can not remove day "+target_change.possible_days[i]+' despite it breaking rule '+j+' due to "hot cut" restrictions.');
+                    }
+                    else if(i == (target_change.possible_days.length - 1) &&
+                       target_change.deployment.deadline &&
+                       splice_indexs.length == (target_change.possible_days.length - 1))
+                    {
+                        // This is the last possible day
+                        //  We have a deadline
+                        //  Can't remove it
+                        this.logger.log('ERROR', "Can not schedule change due to running out of possible days.");
+                        splice_indexs.push(i);
+                        // TODO: More
+                        break; // Don't need to apply any more rules to this
+                               // possible day
+                    }
+                    else
+                    {
+                        splice_indexs.push(i);
+                        break; // Don't need to apply any more rules to this
+                               // possible day
+                    }
+                }
+            }
+        }
+        // Remove the target change's possible days that broke scheduling rules
+        splice_indexs.reverse();
+        for(var s = 0; s < splice_indexs.length; s++)
+        {
+            target_change.possible_days.splice(splice_indexs[s], 1);
+        }
+    }
+};]]></script>
+        <sys_class_name>sys_script_include</sys_class_name>
+        <sys_created_by>mcarter</sys_created_by>
+        <sys_created_on>2016-07-26 15:41:26</sys_created_on>
+        <sys_customer_update>true</sys_customer_update>
+        <sys_id>c2ce74224f3862008ea450ee0310c780</sys_id>
+        <sys_mod_count>54</sys_mod_count>
+        <sys_name>ACSRules</sys_name>
+        <sys_package display_value="ACS" source="x_exeg2_acs">58d89c1c13fca200e93cb16f3244b0d7</sys_package>
+        <sys_policy>read</sys_policy>
+        <sys_replace_on_upgrade>false</sys_replace_on_upgrade>
+        <sys_scope display_value="ACS">58d89c1c13fca200e93cb16f3244b0d7</sys_scope>
+        <sys_update_name>sys_script_include_c2ce74224f3862008ea450ee0310c780</sys_update_name>
+        <sys_updated_by>mcarter</sys_updated_by>
+        <sys_updated_on>2016-09-28 19:01:05</sys_updated_on>
+    </sys_script_include>
+</record_update>

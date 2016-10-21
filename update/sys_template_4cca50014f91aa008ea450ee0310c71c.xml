@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update table="sys_template">
+    <sys_template action="INSERT_OR_UPDATE">
+        <active>true</active>
+        <global>false</global>
+        <group/>
+        <link_element/>
+        <name>acs_fh_upgrade</name>
+        <next/>
+        <next_child/>
+        <roles/>
+        <short_description/>
+        <show_on_template_bar>true</show_on_template_bar>
+        <stand_alone>false</stand_alone>
+        <sys_class_name>sys_template</sys_class_name>
+        <sys_created_by>mcarter</sys_created_by>
+        <sys_created_on>2016-08-15 17:45:50</sys_created_on>
+        <sys_customer_update>true</sys_customer_update>
+        <sys_id>4cca50014f91aa008ea450ee0310c71c</sys_id>
+        <sys_mod_count>5</sys_mod_count>
+        <sys_name>acs_fh_upgrade</sys_name>
+        <sys_package display_value="ACS" source="x_exeg2_acs">58d89c1c13fca200e93cb16f3244b0d7</sys_package>
+        <sys_policy/>
+        <sys_replace_on_upgrade>false</sys_replace_on_upgrade>
+        <sys_scope display_value="ACS">58d89c1c13fca200e93cb16f3244b0d7</sys_scope>
+        <sys_update_name>sys_template_4cca50014f91aa008ea450ee0310c71c</sys_update_name>
+        <sys_updated_by>mcarter</sys_updated_by>
+        <sys_updated_on>2016-08-24 13:49:46</sys_updated_on>
+        <table>change_request</table>
+        <template>change_plan=# Run pre-change snapshots:&#13;
+&#13;
+(echo __CHG_NUMBER__ ; echo 1) | xtp-snap&#13;
+&#13;
+# Update repos and set upstream repository location:&#13;
+&#13;
+if ping -c1 172.17.0.10 &amp;&gt; /dev/null ; then echo &amp;&amp; echo Maintenance Feed system &amp;&amp; cd /usr/local/exegy/puppet/data/ &amp;&amp; git reset --hard &amp;&amp; git checkout master &amp;&amp; git remote set-url origin http://172.17.0.10/git/data.git &amp;&amp; git pull &amp;&amp; cd /usr/local/exegy/puppet/modules/ &amp;&amp; git reset --hard &amp;&amp; git checkout master &amp;&amp; git remote set-url origin http://172.17.0.10/git/puppet.git &amp;&amp; git pull ; else echo &amp;&amp; echo XMS system &amp;&amp; cd /usr/local/exegy/puppet/data/ &amp;&amp; git remote set-url origin http://192.168.101.3/git/data.git &amp;&amp; git pull &amp;&amp; cd /usr/local/exegy/puppet/modules/ &amp;&amp; git remote set-url origin http://192.168.101.3/git/puppet.git &amp;&amp; git pull ; fi&#13;
+&#13;
+# Verify commit has made it to the system:&#13;
+&#13;
+cd /usr/local/exegy/puppet/data ; git describe --all __COMMIT__&#13;
+&#13;
+# Backup feedhandler:&#13;
+&#13;
+\cp -fpv /usr/local/exegy/feedhandlers/lib__FH_NAME__.so /export0/archive/lib__FH_NAME__.so.Pre___CHG_NUMBER__&#13;
+&#13;
+# Stop exelerate:&#13;
+&#13;
+if [ `mdc-info -main | grep -c Started` -ne 1 ]; then echo 'mdc-info is not responding, press ENTER to continue or press CTRL+C to exit.'; read; fi&#13;
+echo $HOSTNAME | estop&#13;
+&#13;
+# Backup persist:&#13;
+&#13;
+if [ -s /export0/archive/Pre___CHG_NUMBER__.tgz ];then echo "File already exists /export0/archive/Pre___CHG_NUMBER__.tgz"; else tar czvf /export0/archive/Pre___CHG_NUMBER__.tgz /usr/local/exegy/mdc ; fi&#13;
+&#13;
+# Run puppet:&#13;
+&#13;
+xpuppet -p&#13;
+&#13;
+# Start exelerate:&#13;
+&#13;
+estart^backout_plan=# Stop exelerate:&#13;
+&#13;
+if [ `mdc-info -main | grep -c Started` -ne 1 ]; then echo 'mdc-info is not responding, press ENTER to continue or press CTRL+C to exit.'; read; fi&#13;
+echo $HOSTNAME | estop&#13;
+&#13;
+# Restore previous feedhandler:&#13;
+&#13;
+\cp -fpv /export0/archive/__FH_NAME__.so.Pre___CHG_NUMBER__ /usr/local/exegy/feedhandlers/__FH_NAME__.so&#13;
+&#13;
+# Start exelerate:&#13;
+&#13;
+estart&#13;
+&#13;
+# Run snapshots to verify no changes made:&#13;
+&#13;
+(echo __CHG_NUMBER__ ; echo 2) | xtp-snap^u_validation_plan=# Run snapshots to verify changes made:&#13;
+&#13;
+(echo __CHG_NUMBER__ ; echo 2) | xtp-snap&#13;
+&#13;
+# Verify feedhandler version:&#13;
+&#13;
+mdc-info -lines -full | grep -A1 __FH_NAME__ | grep 'Handler Ver:' | uniq | grep -c __VERSION__^short_description=ACS change for __FH_NAME__ __VERSION__^u_business_objective=To install or update __FH_NAME__ to version __VERSION__^assignment_group=0148f7bb6fb7a100b13653a11c3ee41d^u_category=629a2f626f3835005318eef11c3ee42d^state=13^reason=^description=ACS change for __FH_NAME__ __VERSION__^u_expedited=false^u_expedite_justification=^u_workflow_state=exec_approval^EQ</template>
+        <user display_value="Matthew Carter (mcarter)">3e2683fc6fd6650059d4a14d5d3ee4db</user>
+        <view/>
+    </sys_template>
+</record_update>

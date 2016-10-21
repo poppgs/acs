@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<database>
+    <element label="Appliance Change Dependencies" max_length="40" name="x_exeg2_acs_appliance_change_dependencies" type="collection">
+        <element label="Appliance" mandatory="true" max_length="32" name="appliance" reference="x_exeg2_cmdb_appliance" type="reference"/>
+        <element label="Day Gap" mandatory="true" max_length="40" name="day_gap" type="integer"/>
+        <element label="Dependency Appliance" mandatory="true" max_length="32" name="dependency_appliance" reference="x_exeg2_cmdb_appliance" type="reference"/>
+        <index name="index">
+            <element name="appliance"/>
+        </index>
+        <index name="index2">
+            <element name="dependency_appliance"/>
+        </index>
+    </element>
+</database>

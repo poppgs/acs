@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<database>
+    <element extends="sys_import_set_row" label="Imp Tmpl X Exeg2 Acs Appliance Change Dependencies" max_length="40" name="u_imp_tmpl_x_exeg2_acs_appliance_change_dependencies" type="collection">
+        <element attributes="import_attribute_name=appliance,edge_encryption_enabled=true" label="appliance" max_length="40" name="u_appliance" type="string"/>
+        <element attributes="import_attribute_name=day_gap" label="day_gap" max_length="40" name="u_day_gap" type="integer"/>
+        <element attributes="import_attribute_name=dependency_appliance,edge_encryption_enabled=true" label="dependency_appliance" max_length="40" name="u_dependency_appliance" type="string"/>
+    </element>
+</database>

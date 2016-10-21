@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update table="sys_script_include">
+    <sys_script_include action="INSERT_OR_UPDATE">
+        <access>package_private</access>
+        <active>true</active>
+        <api_name>x_exeg2_acs.ACSTemplater</api_name>
+        <client_callable>false</client_callable>
+        <description>A class to query and store system template defintions and be able to apply them to glide records.</description>
+        <name>ACSTemplater</name>
+        <script><![CDATA[var ACSTemplater = Class.create();
+
+ACSTemplater.prototype = {
+    /**
+     * Constructor, sets up the member variables
+     */
+    type: 'ACSTemplater',        // Constant
+    initialize: function()
+    {
+        this.templates = {}; // Holds the templates retrieved from SNOW
+    },
+
+
+    /**
+     * Apply the template, denoted by the given name, to a glide record
+     * @param {object} glide_record - The record to which the template needs
+     *                                to be applied
+     * @param {string} template_id - The sys id of the template to apply to
+     *                               the record
+     * @param {object} substitutions - Key/value store of things to
+     *                                 find-and-replace in the glide record
+     */
+    apply_template: function(glide_record, template_id, substitutions)
+    {
+        var template = this.get_template(template_id);
+        if(template != null)
+        {
+            // Fill in each key in the glide record with the matching value
+            var keys = Object.keys(template.template);
+            for(var i = 0; i < keys.length; i++)
+            {
+                glide_record[keys[i]] = template.template[keys[i]];
+
+                var sub_keys = Object.keys(substitutions);
+                for(var j = 0; j < sub_keys.length; j++)
+                {
+                    var sub_regex = new RegExp(sub_keys[j], 'g');
+                    var replacement = substitutions[sub_keys[j]];
+                    glide_record[keys[i]] = glide_record[keys[i]].replace(sub_regex, replacement);
+                }
+            }
+
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    },
+
+
+    /**
+     * Retrieve the template either from SNOW or from our templates instance
+     * variable
+     * @param {string} template_id - The sys id of the template to retrieve
+     */
+     get_template: function(template_id)
+     {
+        if(this.templates[template_id])
+        {
+            return this.templates[template_id];
+        }
+        else
+        {
+            // Get the template from SNOW
+            var template_query = new GlideRecord("sys_template");
+
+            // This is where we will actually store things.
+            var template = {};
+
+            // Get the specific template
+            template_query.get(template_id);
+
+            // Store the variables
+            template.name = template_query.name;
+            template.table = template_query.table;
+            template.raw_template = template_query.template;
+
+            if(template.name)
+            {
+                // Further parse the template
+                var template_key_val = {};
+                var template_split = template.raw_template.split('^');
+
+                for(var i = 0; i < template_split.length; i++)
+                {
+                    var current = template_split[i];
+                    if(current.indexOf('=') !== -1)
+                    {
+                        var kv = current.split('=');
+                        var key = kv[0];
+                        var value = '';
+                        for(var j = 1; j < kv.length; j++)
+                        {
+                            if(j > 1)
+                            {
+                                value += '=';
+                            }
+                            value += kv[j];
+                        }
+
+                        template_key_val[key] = value;
+                    }
+                }
+
+                // Assign the parsed template
+                template.template = template_key_val;
+
+                // Add the template to our list
+                this.templates[template_id] = template;
+            }
+            else
+            {
+                this.templates[template_id] = null;
+            }
+
+            return this.templates[template_id];
+        }
+     }
+};]]></script>
+        <sys_class_name>sys_script_include</sys_class_name>
+        <sys_created_by>mcarter</sys_created_by>
+        <sys_created_on>2016-08-16 13:15:39</sys_created_on>
+        <sys_customer_update>true</sys_customer_update>
+        <sys_id>f227ec514f59aa008ea450ee0310c7cb</sys_id>
+        <sys_mod_count>23</sys_mod_count>
+        <sys_name>ACSTemplater</sys_name>
+        <sys_package display_value="ACS" source="x_exeg2_acs">58d89c1c13fca200e93cb16f3244b0d7</sys_package>
+        <sys_policy>read</sys_policy>
+        <sys_replace_on_upgrade>false</sys_replace_on_upgrade>
+        <sys_scope display_value="ACS">58d89c1c13fca200e93cb16f3244b0d7</sys_scope>
+        <sys_update_name>sys_script_include_f227ec514f59aa008ea450ee0310c7cb</sys_update_name>
+        <sys_updated_by>mcarter</sys_updated_by>
+        <sys_updated_on>2016-09-21 18:26:05</sys_updated_on>
+    </sys_script_include>
+</record_update>

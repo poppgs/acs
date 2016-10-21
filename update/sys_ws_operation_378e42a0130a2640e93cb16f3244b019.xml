@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update table="sys_ws_operation">
+    <sys_ws_operation action="INSERT_OR_UPDATE">
+        <active>true</active>
+        <consumes>application/json,application/xml,text/xml</consumes>
+        <consumes_customized>false</consumes_customized>
+        <default_operation_uri/>
+        <enforce_acl/>
+        <http_method>POST</http_method>
+        <name>schedule</name>
+        <operation_script><![CDATA[(function process(/*RESTAPIRequest*/ request, /*RESTAPIResponse*/ response)
+{
+    response = { success: true, status: '', deployment_count: 0, change_ids: [] };
+    var i = 0;
+    var helper = new ACSHighLevelHelper();
+
+    var logger = new ACSLogger();
+    logger.set_source('ScheduleRestAPI');
+
+    // Get the scheduling configuration
+    var scheduling_config = helper.get_scheduling_config();
+
+    // Get the parameters passed in
+    var params = request.body.data;
+    var acs_deployment_sys_id = params.deployment;
+
+    // Retrieve the ACS Deployment
+    var raw_acs_deployment = helper.get_acs_deployment(acs_deployment_sys_id);
+
+    if(raw_acs_deployment == null)
+    {
+        response.success = false;
+        response.status = 'Could not find deployment with sys_id: '+acs_deployment_sys_id;
+        return response;
+    }
+
+    // Retrieve the deployment items (key value pairs of what this deployment
+    //  is changing/deploying)
+    var deployment_items = helper.get_acs_deployment_items(acs_deployment_sys_id);
+
+    // Create the ACSDeployment objects out of the data we have gathered
+    var acs_deployments = [];
+
+    // If this is a firmware deployment we just have one ACSDeployment
+    // If this is a deployment for a config RPM or Feed Handler we need to
+    // determine every firmware version that is relevant and make an
+    // ACSDeployment for each of those firmware versions
+    var acs_deployment = null;
+    if(raw_acs_deployment.category == 'Firmware')
+    {
+        // Just one deployment
+        acs_deployment = new ACSDeployment();
+        acs_deployment.id                  = acs_deployment_sys_id;
+        acs_deployment.name                = raw_acs_deployment.name;
+        acs_deployment.deployment_items    = deployment_items;
+        acs_deployment.category            = raw_acs_deployment.category;
+        acs_deployment.target_appliances   = raw_acs_deployment.target_appliances;
+        acs_deployment.start_date          = raw_acs_deployment.start_date;
+        acs_deployment.deadline            = raw_acs_deployment.deadline;
+        acs_deployment.release_type        = raw_acs_deployment.release_type;
+        acs_deployment.hot_cut             = raw_acs_deployment.hot_cut;
+        acs_deployment.unique_key          = raw_acs_deployment.number;
+        acs_deployment.version             = raw_acs_deployment.version;
+        acs_deployment.firmware_version    = raw_acs_deployment.version;
+
+        acs_deployments.push(acs_deployment);
+    }
+    else // TODO: may need to change to else-ifs
+    {
+        // Feed Handler/Init Lib/etc.
+        // Gather all relevant firmware versions
+        var firmware_versions = helper.gather_fw_versions(raw_acs_deployment.name, raw_acs_deployment.version);
+
+        for(i = 0; i < firmware_versions.length; i++)
+        {
+            var fw_ver = firmware_versions[i];
+            acs_deployment = new ACSDeployment();
+            acs_deployment.id                  = acs_deployment_sys_id;
+            acs_deployment.name                = raw_acs_deployment.name;
+            acs_deployment.deployment_items    = deployment_items;
+            acs_deployment.category            = raw_acs_deployment.category;
+            acs_deployment.target_appliances   = raw_acs_deployment.target_appliances;
+            acs_deployment.start_date          = raw_acs_deployment.start_date;
+            acs_deployment.deadline            = raw_acs_deployment.deadline;
+            acs_deployment.release_type        = raw_acs_deployment.release_type;
+            acs_deployment.hot_cut             = raw_acs_deployment.hot_cut;
+            acs_deployment.unique_key          = raw_acs_deployment.number;
+            acs_deployment.version             = fw_ver+'.'+raw_acs_deployment.version;
+            acs_deployment.firmware_version    = fw_ver;
+
+            acs_deployments.push(acs_deployment);
+        }
+    }
+
+    // Make sure we include the correct deployment count in the response
+    response.deployment_count = acs_deployments.length;
+    
+
+    // If we have at least one acs_deployment proceed, otherwise we are finished.
+    if(!acs_deployments.length)
+    {
+        response.success = false;
+        response.status = 'Could not create any deployment objects to schedule out of the supplied deployment ('+acs_deployment_sys_id+')!';
+        return response;
+    }
+
+    // Before we do all of our scheduling stuff we need to retrieve an array of
+    // existing Exegy appliances so we can provide them to each ACSRelease
+    // object. We could do this inside the ACSRelease object, but then we'd be
+    // querying for the same thing in every object. More efficient this way.
+    var all_appliances = helper.get_appliances(raw_acs_deployment.target_appliances);
+
+    // Also before we do all of our scheduling stuff we need to retrieve either
+    // the array of feed handler instances or the array of init lib instances,
+    // so we can provide them to each ACSRelease object. Again, this is for
+    // improved efficency in the case of more than one ACSRelease object.
+    var fh_instances = null;
+    var il_instances = null;
+    if(acs_deployments[0].deployment_category == 'Feed Handler')
+    {
+        fh_instances = helper.get_feedhandler_instances();
+    }
+    else if(acs_deployments[0].deployment_category == 'Initialization Library')
+    {
+        il_instances = helper.get_init_lib_instances();
+    }
+    // TODO: else/else if?
+
+
+    // Keep track of the schedule change IDs
+    var scheduled_change_ids = [];
+
+    // For every release instance, instantiate an ACS release object
+    //  That object can then create change instances, calculate the appropriate
+    //  scheduling for each, and enter the CRs.
+    for(i = 0; i < acs_deployments.length; i++)
+    {
+        // Give the object access to the init lib/fh instance data
+        acs_deployments[i].feedhandler_instances = fh_instances;
+        acs_deployments[i].init_lib_instances = il_instances;
+
+        // Give the object access to all of the Exegy appliances
+        acs_deployments[i].all_appliances = all_appliances;
+
+        // Give the object access to the scheduling configuration
+        acs_deployments[i].scheduling_config = scheduling_config;
+
+        // Every time we create a new ACS release object we need to gather all of
+        // the existing ACS change requests, so the ACS release object knows what 
+        // to schedule around.
+        var existing_changes = [];
+
+        var cr_query = new GlideRecord("change_request");
+        cr_query.addQuery("state", 'IN', '1,2,11,12,13');
+        cr_query.query();
+
+        while(cr_query.next())
+        {
+            // Because of our query filters we know this is a change that has not
+            // yet been implemented/executed
+            // Create a new change instance object and add it to our array:
+            var change_instance = new ACSChangeInstance();
+            change_instance.deployment = acs_deployments[i];
+            change_instance.from_glide_record(cr_query);
+
+            existing_changes.push(change_instance);
+        } 
+
+        //Kick off the scheduling for this release instance
+        scheduled_change_ids = scheduled_change_ids.concat(acs_deployments[i].create_and_schedule_changes(existing_changes));
+    }
+
+    response.success = true;
+    response.status = 'Created and scheduled changes for '+ acs_deployments.length +' deployment(s) (one for each firmware version applicable).';
+    response.change_ids = scheduled_change_ids;
+
+    return response;
+})(request, response);]]></operation_script>
+        <operation_uri>/api/x_exeg2_acs/acs_schedule</operation_uri>
+        <produces>application/json,application/xml,text/xml</produces>
+        <produces_customized>false</produces_customized>
+        <relative_path>/</relative_path>
+        <request_example/>
+        <requires_acl_authorization>false</requires_acl_authorization>
+        <requires_authentication>true</requires_authentication>
+        <short_description/>
+        <sys_class_name>sys_ws_operation</sys_class_name>
+        <sys_created_by>mcarter</sys_created_by>
+        <sys_created_on>2016-09-21 18:24:02</sys_created_on>
+        <sys_customer_update>true</sys_customer_update>
+        <sys_id>378e42a0130a2640e93cb16f3244b019</sys_id>
+        <sys_mod_count>18</sys_mod_count>
+        <sys_name>schedule</sys_name>
+        <sys_package display_value="ACS" source="x_exeg2_acs">58d89c1c13fca200e93cb16f3244b0d7</sys_package>
+        <sys_policy/>
+        <sys_replace_on_upgrade>false</sys_replace_on_upgrade>
+        <sys_scope display_value="ACS">58d89c1c13fca200e93cb16f3244b0d7</sys_scope>
+        <sys_update_name>sys_ws_operation_378e42a0130a2640e93cb16f3244b019</sys_update_name>
+        <sys_updated_by>mcarter</sys_updated_by>
+        <sys_updated_on>2016-09-29 19:40:40</sys_updated_on>
+        <web_service_definition display_value="acs_schedule">955e8e60130a2640e93cb16f3244b05b</web_service_definition>
+        <web_service_version/>
+    </sys_ws_operation>
+</record_update>

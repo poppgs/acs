@@ -1,0 +1,911 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update table="sys_script_include">
+    <sys_script_include action="INSERT_OR_UPDATE">
+        <access>package_private</access>
+        <active>true</active>
+        <api_name>x_exeg2_acs.ACSChangeInstance</api_name>
+        <client_callable>false</client_callable>
+        <description>A class to hold information and functions for an instance of a change based on a release. Is able to handle scheduling/rules. Model of a change in reference to Automatic Change Scheduling.</description>
+        <name>ACSChangeInstance</name>
+        <script><![CDATA[var ACSChangeInstance = Class.create();
+
+ACSChangeInstance.prototype = {
+    /**
+     * Constructor, sets up the member variables.
+     */
+    type: 'ACSChangeInstance',        // Constant
+    MAX_DAYS_AHEAD: 60,               // Constant
+    DAY_IN_MS: (24 * 60 * 60 * 1000), // Constant
+    initialize: function()
+    {
+        this.original_index = null;
+        this.appliance      = null;  // JS object with fields from SNOW
+        this.new_change     = false; // Only true if this is a brand new
+                                     //  change that didn't already exist
+                                     //  in SNOW
+        this.changed        = false; // Only true if this is not a brand new
+                                     //  change and we needed to
+                                     //  update/reschedule it (currently not
+                                     //  implemented)
+        this.deployment     = null;  // The ACSDeployment object we are 
+                                     //  currently scheduling... if this was
+                                     //  an existing change that is being
+                                     //  pulled it this will not necessarily
+                                     //  be the deployment the change was
+                                     //  originally associated with
+        this.possible_days  = [];    // All the possible days that this change
+                                     //  could be scheduled on, will change as
+                                     //  rules are applied repeatedly
+        this.selected_day   = false; // Once a date is selected this will not
+                                     //  be a bool, but a JS Date object
+
+        this.logger = new ACSLogger();
+        this.logger.set_source('ACSChangeInstance');
+    },
+    
+    
+    /**
+     * Given data (a glide record) gathered from Service (Exegy) Now, populate
+     * the change instance's variables
+     * @param {object} glide_record - The record from Service Now to import.
+     */
+    from_glide_record: function(glide_record)
+    {
+        // NOTE: this.deployment will be the CURRENT DEPLOYMENT WE ARE
+        //       SCHEDULING, not the deployment that was originally
+        //       associated with this existing change
+        // We may need sys id, it is used in rescheduling:
+        this.sys_id = String(glide_record.sys_id);
+
+        // We may need acs_ref in the future:
+        this.acs_ref = glide_record.u_acs_ref;
+
+        // CHG number:
+        this.number = glide_record.getValue('number');
+
+        // Determine the start_date
+        var date_string = glide_record.start_date.getDisplayValue();
+        if(date_string)
+        {
+            // Create a GlideDateTime from the date string in the change request
+            var date_string_split = date_string.split(' ')[0].split('-');
+            var gdt = new GlideDateTime();
+            gdt.setYearLocalTime(parseInt(date_string_split[0]));
+            gdt.setMonthLocalTime(parseInt(date_string_split[1]));
+            gdt.setDayOfMonthLocalTime(parseInt(date_string_split[2]));
+
+            // Create a native JavaScript date object from the GlideDateTime object
+            this.selected_day = new Date(gdt.getNumericValue());
+
+            // Make sure the time portion of the datetime is just set for noon
+            this.selected_day.setHours(12);
+            this.selected_day.setMinutes(0);
+            this.selected_day.setSeconds(0);
+            this.selected_day.setMilliseconds(0);
+        }
+        else
+        {
+            this.selected_day = false;
+        }
+
+        // Look up the appliance record from the deployments appliance data
+        // and add it to this change
+        this.new_appliance_name = String(glide_record.cmdb_ci.getDisplayValue());
+        this.appliance_name = String(glide_record.cmdb_ci.u_legacy_name);
+        if(this.deployment)
+        {
+            for(var i = 0; i < this.deployment.all_appliances.length; i++)
+            {
+                if(this.deployment.all_appliances[i].name == this.appliance_name)
+                {
+                    this.appliance = this.deployment.all_appliances[i];
+                    break;
+                }
+            }
+        }
+    },
+
+
+    /**
+     * Function to store a record of this change instance in service now
+     * @param {ACSTemplater} templater - An ACSTemplater object that will help
+     *                                   fill in content for this change
+     *                                   instance
+     * @param {string} template_id - The sys id of the SNOW template to apply
+     */
+    add_to_snow: function(templater, template_id)
+    {
+        var i = 0;
+        var gr = new GlideRecord('change_request');
+        gr.initialize();
+
+        if(this.selected_day != false)
+        {
+            var start_date = this.selected_day.getFullYear()+'-'+(this.selected_day.getMonth() + 1)+'-'+this.selected_day.getDate();
+            var end_date = start_date; // Ends on the same day
+            var times = this.pick_time_from_maintenance_schedule();
+
+            gr.start_date = start_date+' '+times.start;
+            gr.end_date = end_date+' '+times.end;
+        }
+
+        gr.cmdb_ci = this.appliance.sys_id;
+        gr.u_acs_ref = this.deployment.id;
+
+        // Put in some metadata for other automated processes to use down
+        // the line
+        var meta = {};
+        meta.deployment_category = String(this.deployment.category);
+        if(meta.deployment_category == 'Feed Handler')
+        {
+            meta.name = String(this.deployment.name);
+            meta.version = String(this.deployment.version);
+            meta.firmware_version = String(this.deployment.firmware_version);
+        }
+        else
+        {
+            meta.items = [];
+            for(i = 0; i < this.deployment.deployment_items.length; i++)
+            {
+                var item = {};
+                item.type = this.deployment.deployment_items[i].type;
+                if(item.type !== 'config_changes_description')
+                {
+                    item.name = this.deployment.deployment_items[i].name;
+                    item.value = this.deployment.deployment_items[i].value;
+
+                    meta.items.push(item);
+                }
+            }
+        }
+        gr.test_plan = JSON.stringify(meta);
+
+        // Insert so we can get a change number
+        var id = gr.insert();
+
+        // Apply the template
+        var substitutions = {
+            '__CHG_NUMBER__': gr.number,
+            '__VERSION__': this.deployment.version,
+            '__FH_NAME__': this.deployment.name
+        };
+        templater.apply_template(gr, template_id, substitutions);
+
+        // See if this change requires manual config changes to be made later
+        for(i = 0; i < this.deployment.deployment_items.length; i++)
+        {
+            var di = this.deployment.deployment_items[i];
+            if(di.type === 'config_changes_description')
+            {
+                // Manual config change description.
+                // Assignment group should be MDE
+                // Assigned to should be jmurphy
+                // Put the description of the changes needed int he work notes
+                gr.work_notes = 'Config changes must be made in order to complete this change:<br/>'+di.value;
+                gr.assignment_group = '05c7e1c96fa131005318eef11c3ee4f7';
+                gr.assigned_to = 'ce29766c6f69524059d4a14d5d3ee4c9';
+            }
+        }
+
+        
+        if(meta.deployment_category == 'Firmware')
+        {
+            // SPECIAL CASE
+            // We can generate a very nice validation plan using all of our
+            // metadata
+            var validation = '';
+            for(i = 0; i < this.deployment.deployment_items.length; i++)
+            {
+                var di = this.deployment.deployment_items[i];
+
+                if(di.type !== 'config_changes_description' && i)
+                {
+                    validation += '\n';
+                }
+
+                if(di.type === 'feedhandler')
+                {
+                    validation += 'rpmqaout=`rpm -qa | grep -i '+ di.name +'`; if [ `echo $rpmqaout | grep -ce '+ di.value +'` -gt 0 ]; then echo -e "\\e[0;32mSUCCESS: $rpmqaout\\e[0m"; else echo -e "\\e[0;31mFAILED: $rpmqaout\\e[0m"; fi';
+                }
+                else if(di.type === 'firmware')
+                {
+                    validation += 'rpmqaout=`rpm -qa | grep -i Exegy-TickerPlant`; if [ `echo $rpmqaout | grep -ce '+ di.value +'` -gt 0 ]; then echo -e "\\e[0;32mSUCCESS: $rpmqaout\\e[0m"; else echo -e "\\e[0;31mFAILED: $rpmqaout\\e[0m"; fi';
+                }
+                else if(di.type === 'configs_rpm')
+                {
+                    validation += 'rpmqaout=`rpm -qa | grep -i Exegy-Configs`; if [ `echo $rpmqaout | grep -ce '+ di.value +'` -gt 0 ]; then echo -e "\\e[0;32mSUCCESS: $rpmqaout\\e[0m"; else echo -e "\\e[0;31mFAILED: $rpmqaout\\e[0m"; fi';
+                }
+                else if(di.type === 'immutable' && di.name == this.appliance.name)
+                {
+                    validation += 'rdlnkout=`readlink /usr/local/exegy/config/libconf-exegy.so`; if [ `echo $rdlnkout | grep -ce '+ di.value +'` -gt 0 ]; then echo -e "\\e[0;32mSUCCESS: $rdlnkout\\e[0m"; else echo -e "\\e[0;31mFAILED: $rdlnkout\\e[0m"; fi';
+                }
+            }
+
+            gr.u_validation_plan = validation;
+        }
+
+
+        // Update now that we have applied the template
+        gr.update();
+
+        this.logger.log('INFO', 'Inserted change: '+ id);
+        return id;
+    },
+
+
+    /**
+     * Function to reschedule a change instance. Needs to query service now
+     * for the change's sys ID and then reschedule that record by changing the
+     * start date and end date. No other contents of the change need to be
+     * altered
+     */
+    reschedule: function(templater, template_id)
+    {
+        // TODO  
+        var change_query = new GlideRecord("change_request");
+        change_query.addQuery("sys_id", this.sys_id);
+  
+        // Run the query
+        change_query.query();
+
+        // Keep track of whether we rescheduled or not
+        var success = false;
+  
+        // Loop through the results
+        while(change_query.next())
+        {
+            var start_date = this.selected_day.getFullYear()+'-'+(this.selected_day.getMonth() + 1)+'-'+this.selected_day.getDate();
+            var end_date = start_date; // Ends on the same day
+            var times = this.pick_time_from_maintenance_schedule();
+
+            change_query.start_date = start_date+' '+times.start;
+            change_query.end_date = end_date+' '+times.end;
+
+            change_query.update();
+            success = true;
+        }
+
+        if(!success)
+        {
+            this.logger.log('ERROR', 'Could not find change with sys id: '+this.sys_id+' for rescheduling.');
+            return null;
+        }
+        else
+        {
+            return this.sys_id;
+        }
+    },
+
+
+    /**
+     * Takes in a number of days in the future and returns a JavaScript date
+     * object for that day.
+     * @param {integer} days_in_the_future - How many days in the future to
+     *                                       return a date for. Should be 
+     *                                       no less than zero.
+     */
+     get_date: function(days_in_the_future)
+     {
+        var day_in_ms = 24 * 60 * 60 * 1000;
+        var ms_in_the_future = days_in_the_future * this.DAY_IN_MS;
+
+        var new_day = new Date(new Date().getTime() + ms_in_the_future);
+        new_day.setHours(12); // Middle of day
+        new_day.setMinutes(0);
+        new_day.setSeconds(0);
+        new_day.setMilliseconds(0);
+
+        return new_day;
+     },
+
+
+     /**
+      * Takes a date string (YYYY-MM-DD) and creates a javascript date object
+      * out of it. This functionality SHOULD be native to JavaScript, but for
+      * whatever reason I can't get it to work inside of SNOW.
+      * @param {string} date_string - The YYYY-MM-DD string to create a JS
+      *                               date object out of
+      */
+     date_from_string: function(date_string)
+     {
+        // Default to today if string is empty
+        if (!date_string)
+            return new Date();
+        if(date_string.indexOf(' ') != -1)
+        {
+            date_string = date_string.split(' ')[0];
+        }
+
+        var msg = 'Date string is: '+date_string;
+        var split = date_string.split('-');
+        var date = new Date();
+
+        // Make sure we just have a normal date for every change that is
+        // at the same time
+        // I know that changes can and will be scheduled for different
+        // times of day, but for scheduling purposes we don't need to
+        // worry about that (until we actually create records in the
+        // change_request table)
+        var year_to_set = parseInt(split[0]);
+        var month_to_set = parseInt(split[1]) - 1;
+        var date_to_set = parseInt(split[2]);
+        msg += '\nSetting to: '+year_to_set+'-'+month_to_set+'-'+date_to_set;
+        
+        date.setYear(year_to_set);
+        date.setMonth(month_to_set); // Because JavaScript
+        date.setDate(date_to_set); // Because UTC
+        date.setHours(12); // Middle of day
+        date.setMinutes(0);
+        date.setSeconds(0);
+        date.setMilliseconds(0);
+
+        msg += '\nResult is: '+date;
+        //gs.info(msg);
+
+        return date;
+    },
+
+
+    /**
+     * Look at this change instance's appliance's schedules. Find the
+     * appliance's "maintenance" schedule and use that as well as the selected
+     * date to determine what the start and end time for this change instance
+     * should be.
+     */
+    pick_time_from_maintenance_schedule: function()
+    {
+        var found_window = false;
+        var times = { start: '18:00:00', end: '22:59:00' }; // Defaults
+
+        if(this.selected_day)
+        {
+            // Loop through the appliance's schedules and find the maintenance
+            // schedule
+            for(var i = 0; i < this.appliance.schedules.length; i++)
+            {
+                var schedule = this.appliance.schedules[i];
+                
+                if(schedule.type == 'maintenance')
+                {
+                    // This is the appliance's maintenance schedule
+                    // Detemine what times we should use
+                    // TODO
+                    var day_of_week = this.translate_int_to_day_of_week(this.selected_day.getDay());
+
+                    for(var j = 0; j < schedule.entries.length; j++)
+                    {
+                        var entry = schedule.entries[j];
+                        var day_match_entry = false;
+
+                        if(entry.repeat_type == 'Every Sunday'    ||
+                           entry.repeat_type == 'Every Monday'    ||
+                           entry.repeat_type == 'Every Tuesday'   ||
+                           entry.repeat_type == 'Every Wednesday' ||
+                           entry.repeat_type == 'Every Thursday'  ||
+                           entry.repeat_type == 'Every Friday'    ||
+                           entry.repeat_type == 'Every Saturday')
+                        {
+                            // Figure out if we are on the right day
+                            var correct_day = entry.repeat_type.split(' ')[1];
+                            if(day_of_week == correct_day)
+                            {
+                                day_match_entry = true;
+                            }
+                        }
+                        else if(entry.repeat_type == 'Every Weekday (Mon-Fri)')
+                        {
+                            // Figure out if we are on the right day
+                            if(day_of_week == 'Monday'    ||
+                               day_of_week == 'Tuesday'   ||
+                               day_of_week == 'Wednesday' ||
+                               day_of_week == 'Thursday'  ||
+                               day_of_week == 'Friday')
+                            {
+                                day_match_entry = true;
+                            }
+                        }
+                        else if(entry.repeat_type == 'Every Weekend (Sat, Sun)')
+                        {
+                            // Figure out if we are on the right day
+                            if(day_of_week == 'Saturday' || day_of_week == 'Sunday')
+                            {
+                                day_match_entry = true;
+                            }
+                        }
+                        else if(entry.repeat_type == 'Every Mon, Wed, Fri')
+                        {
+                            // Figure out if we are on the right day
+                            if(day_of_week == 'Monday'    ||
+                               day_of_week == 'Wednesday' ||
+                               day_of_week == 'Friday')
+                            {
+                                day_match_entry = true;
+                            }
+                        }
+                        else if(entry.repeat_type == 'Every Tue, Thu')
+                        {
+                            // Figure out if we are on the right day
+                            if(day_of_week == 'Tuesday' || day_of_week == 'Thursday')
+                            {
+                                day_match_entry = true;
+                            }
+                        }
+                        // TODO: More elses/ifs?
+
+                        if(day_match_entry)
+                        {
+                            // Grab the start/end times from this and set them
+                            // as our return values
+                            found_window = true;
+                            times.start = entry.start_date_time.split(' ')[1];
+                            times.end = entry.end_date_time.split(' ')[1];
+                            break;
+                        }
+                    }
+
+                    break;
+                }
+            }
+        }
+
+        if(!found_window)
+        {
+            var message = 'Could not find good time to schedule change for '+this.appliance.name+', defaulting to ';
+            message += times.start +' - '+ times.end;
+            this.logger.log('WARNING', message);
+        }
+
+        return times;
+    },
+
+
+    /**
+     * Given an integer 0 through 6 return the string that denotes that day of
+     * the week. Sunday is 0, Monday is 1, and so on.
+     */
+    translate_int_to_day_of_week: function(dow_int)
+    {
+        var days_of_week = ['Sunday', 'Monday', 'Tuesday', 'Wednesday',
+                            'Thursday', 'Friday', 'Saturday'];
+
+        if(dow_int >= 0 && dow_int < 7)
+        {
+            return days_of_week[dow_int];
+        }
+        else
+        {
+            return null;
+        }
+    },
+
+
+    /**
+     * Given a string representing a month ('January', 'March', 'December',
+     * etc), return the integer representing what month that is.
+     */
+    translate_month_string_to_int: function(month_string)
+    {
+        var months = [ 'January', 'February', 'March',
+                       'April', 'May', 'June', 'July',
+                       'August', 'September', 'October',
+                       'November', 'December' ];
+
+        var index = months.indexOf(month_string);
+
+        return (index + 1);
+    },
+
+
+    /**
+     * Given a day (date) and a schedule entry, determine if the day should be
+     * removed from scheduling consideration based on the schedule
+     * @param {date} day - The day (date) to check against the schedule
+     * @param {object} schedule_entry - The schedule entry for which to check
+     *                                  the day
+     * @param {string} list_type - blacklist or whitelist
+     */
+    should_day_be_removed_based_on_schedule_entry: function(day, schedule_entry, list_type)
+    {
+        var remove = false;
+        var day_match_schedule = false;
+
+        var day_date = parseInt(day.getDate());
+        var day_month = parseInt(day.getMonth() + 1);
+        var day_year = parseInt(day.getFullYear());
+        var day_of_week = this.translate_int_to_day_of_week(day.getDay());
+        
+        // Make sure that if this is a repeating schedule that we don't go
+        // past the "repeat until" date
+        if(schedule_entry.repeat_type != '' &&
+           schedule_entry.repeat_type &&
+           schedule_entry.repeat_type != null &&
+           schedule_entry.repeat_until != '' &&
+           schedule_entry.repeat_until &&
+           schedule_entry.repeat_until != null) // Ew
+        {
+            var repeat_until = this.date_from_string(schedule_entry.repeat_until);
+            var now = new Date();
+            now.setHours(12);
+            now.setMinutes(0);
+            now.setSeconds(0);
+            now.setMilliseconds(0);
+
+            if(now.getTime() > repeat_until.getTime())
+            {
+                // We've hit the end of the repetitions, ignore this
+                return false;
+            }
+        }
+
+
+        // Determine the repeat type
+        if(schedule_entry.repeat_type == 'Yearly')
+        {
+            // Determine the yearly_type
+            if(schedule_entry.yearly_type == 'Day of the year')
+            {
+                // Take the start_date_time and remove the year, the remaining
+                // contents of the date are what to compare against
+                var sdate = schedule_entry.start_date_time.split(' ')[0];
+                var sdate_split = sdate.split('-');
+                var month = parseInt(sdate_split[1]);
+                var date = parseInt(sdate_split[2]);
+
+                if(day_date == date && day_month == month)
+                {
+                    day_match_schedule = true;
+                }
+            }
+            else if(schedule_entry.yearly_type == 'Floating')
+            {
+                if(schedule_entry.monthly_type == 'Day of the month')
+                {
+                    // This is going to be a specific day of the week, on a
+                    // specific week, in a specific month
+                    // For example: 2nd Monday of October
+                    // Another example: 3rd Thursday of February
+                    var month_string = schedule_entry.month;
+                    var float_week = parseInt(schedule_entry.float_week);
+                    if(schedule_entry.float_week == 'Last' || schedule_entry.float_week == 'First')
+                    {
+                        float_week = schedule_entry.float_week;
+                    }
+                    var float_day = schedule_entry.float_day;
+                    var month_int = this.translate_month_string_to_int(month_string);
+
+                    if(day_of_week == float_day && month_int == day_month)
+                    {
+                        // The correct day of week, see if the correct
+                        // iteration of that day in the month
+                        var day_iteration = 0;
+                        var target_date_was_on_this_iteration = null;
+                        for(var i = 1; i <= 31; i++)
+                        {
+                            var date_string = day_year+'-'+day_month+'-'+i+' 12:00:00';
+                            var iteration_date = this.date_from_string(date_string);
+
+                            var dow = this.translate_int_to_day_of_week(iteration_date.getDay());
+
+                            if(dow == float_day)
+                            {
+                                day_iteration++;
+
+                                if(day_iteration == float_week || (day_iteration == 1 && float_week == 'First'))
+                                {
+                                    // This is the nth (correct) float_day of
+                                    // the month
+                                    // If i is the day_date then then the day
+                                    // is the right day!
+                                    if(i == day_date)
+                                    {
+                                        day_match_schedule = true;
+                                        break;
+                                    }
+                                }
+                                else if(float_week == 'Last')
+                                {
+                                    // Special case!
+                                    if(i == day_date)
+                                    {
+                                        target_date_was_on_this_iteration = day_iteration;
+                                    }
+                                }
+                                else if(float_week == 'First' && day_iteration > 1)
+                                {
+                                    break;
+                                }
+                                else if(day_iteration > float_week)
+                                {
+                                    break;
+                                }
+                            }
+                        }
+
+                        if(float_week == 'Last')
+                        {
+                            // Handle the special case of last
+                            if(target_date_was_on_this_iteration == day_iteration)
+                            {
+                                day_match_schedule = true;
+                            }
+                        }
+                    }
+                }
+                // else TODO: Is there another possibility?
+            }
+        }
+        else if(schedule_entry.repeat_type == 'Every Sunday'    ||
+                schedule_entry.repeat_type == 'Every Monday'    ||
+                schedule_entry.repeat_type == 'Every Tuesday'   ||
+                schedule_entry.repeat_type == 'Every Wednesday' ||
+                schedule_entry.repeat_type == 'Every Thursday'  ||
+                schedule_entry.repeat_type == 'Every Friday'    ||
+                schedule_entry.repeat_type == 'Every Saturday')
+        {
+            // Figure out if we are on the right day
+            var correct_day = schedule_entry.repeat_type.split(' ')[1];
+            if(day_of_week == correct_day)
+            {
+                day_match_schedule = true;
+            }
+        }
+        else if(schedule_entry.repeat_type == 'Every Weekday (Mon-Fri)')
+        {
+            // Figure out if we are on the right day
+            if(day_of_week == 'Monday'    ||
+               day_of_week == 'Tuesday'   ||
+               day_of_week == 'Wednesday' ||
+               day_of_week == 'Thursday'  ||
+               day_of_week == 'Friday')
+            {
+                day_match_schedule = true;
+            }
+        }
+        else if(schedule_entry.repeat_type == 'Every Weekend (Sat, Sun)')
+        {
+            // Figure out if we are on the right day
+            if(day_of_week == 'Saturday' || day_of_week == 'Sunday')
+            {
+                day_match_schedule = true;
+            }
+        }
+        else if(schedule_entry.repeat_type == 'Every Mon, Wed, Fri')
+        {
+            // Figure out if we are on the right day
+            if(day_of_week == 'Monday'    ||
+               day_of_week == 'Wednesday' ||
+               day_of_week == 'Friday')
+            {
+                day_match_schedule = true;
+            }
+        }
+        else if(schedule_entry.repeat_type == 'Every Tue, Thu')
+        {
+            // Figure out if we are on the right day
+            if(day_of_week == 'Tuesday' || day_of_week == 'Thursday')
+            {
+                day_match_schedule = true;
+            }
+        }
+        else if(schedule_entry.repeat_type == '' || !schedule_entry.repeat_type || schedule_entry.repeat_type == null)
+        {
+            // Specific date/time span
+            var start_date = this.date_from_string(schedule_entry.start_date_time);
+            var end_date = this.date_from_string(schedule_entry.end_date_time);
+
+            // Make sure we are at or below the end date and at or after the
+            // start date
+            var day_timestamp = day.getTime();
+            var start_timestamp = start_date.getTime();
+            var end_timestamp = end_date.getTime();
+            var start_offset = day_timestamp - start_timestamp;
+            var end_offset = day_timestamp - end_timestamp;
+            var three_hours = 10800000;
+
+            if(start_offset >= 0 || Math.abs(start_offset) < three_hours)
+            {
+                // We are greater than or equal to our start date
+                // See if we are less than or equal to our end date
+                if(end_offset <= 0 || Math.abs(end_offset) < three_hours)
+                {
+                    // Greater than or equal to start
+                    // Less than or equal to end
+                    day_match_schedule = true;
+                }
+            }
+            // TODO: Test this
+        }
+        // else TODO
+
+        // Determine if the schedule is a whitelist or blacklist, and set our
+        // return value accordingly
+        if(list_type == 'blacklist')
+        {
+            if(day_match_schedule)
+            {
+                remove = true;
+            }
+        }
+        else if(list_type == 'whitelist')
+        {
+            if(!day_match_schedule)
+            {
+                remove = true;
+            }
+        }
+
+        return remove;
+    },
+
+
+    /**
+     * To be called after the baseline days are calculated for the change
+     * instance. Loops through all the schedules assigned to the appliance
+     * and applies them to the baseline days (limits the days)
+     */
+    apply_schedules_to_baseline_days: function()
+    {
+        var i = 0;
+        var indexes_to_remove = [];
+
+        // Loop through all the current possible days and determine which ones
+        // need to be removed because of the appliance's schedules
+        for(i = 0; i < this.possible_days.length; i++)
+        {
+            var day = this.possible_days[i];
+            var remove = false;
+
+            // Loop through all the schedules that apply to the appliance and
+            // see if this possible day fits in with those schedules
+            for(var j = 0; j < this.appliance.schedules.length; j++)
+            {
+                var schedule = this.appliance.schedules[j];
+
+                for(var k = 0; k < schedule.entries.length; k++)
+                {
+                    var entry = schedule.entries[k];
+
+                    if(schedule.type == 'whitelist' || schedule.type == 'blacklist')
+                    {
+                        remove = this.should_day_be_removed_based_on_schedule_entry(day, entry, schedule.type);
+                        
+                        if(schedule.type == 'whitelist')
+                        {
+                            if(!remove)
+                            {
+                                break;
+                            }
+                        }
+                        else if(remove)
+                        {
+                            break;
+                        }
+                    }
+                }
+
+                if(remove)
+                {
+                    break;
+                }
+            }
+
+            if(remove)
+            {
+                indexes_to_remove.push(i);
+            }
+        }
+
+        // Remove the days that don't fit our schedules
+        indexes_to_remove.reverse();
+        for(i = 0; i < indexes_to_remove.length; i++)
+        {
+            this.possible_days.splice(indexes_to_remove[i], 1);
+        }
+    },
+
+
+    /**
+     * Fill the possible days array without taking into account anything but
+     * the deployment deadline (if there is one), the start date, and the
+     * maximum number of days ahead.
+     */
+    create_baseline_possible_days: function()
+    {
+        var start_date = this.date_from_string(String(this.deployment.start_date));
+        var deadline = null;
+        var hot_cut = this.deployment.hot_cut;
+        if(this.deployment.deadline != null &&
+           this.deployment.deadline != undefined &&
+           String(this.deployment.deadline).trim() != '')
+        {
+            deadline = this.date_from_string(String(this.deployment.deadline));
+        }
+        this.possible_days = [];
+        
+        if(hot_cut)
+        {
+            // There is only one possible day, the day before the deadline
+            var day_in_ms = 24 * 60 * 60 * 1000;
+
+            var new_possible_day = new Date(deadline.getTime() - day_in_ms);
+            new_possible_day.setHours(12);
+            new_possible_day.setMinutes(0);
+            new_possible_day.setSeconds(0);
+            new_possible_day.setMilliseconds(0);
+
+            this.possible_days.push(new_possible_day);
+        }
+        else
+        {
+            var at_or_after_start_date = false;
+            for(var i = 0; i <= this.MAX_DAYS_AHEAD; i++)
+            {
+                var day = this.get_date(i);
+
+                if(!at_or_after_start_date)
+                {
+                    // Make sure this day is at or after the start date
+                    at_or_after_start_date = day >= start_date;
+                }
+
+                if(at_or_after_start_date)
+                {
+                    if(deadline)
+                    {
+                        // Make sure we haven't overrun the deadline
+                        if(day <= deadline)
+                        {
+                            // This is a possible day
+                            this.possible_days.push(day);
+                        }
+                        else
+                        {
+                            // This day, and all upcomming days in the for
+                            // loop, is/are past the deadline
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        this.possible_days.push(day);
+                    }
+                }
+            }
+        }
+    },
+
+
+    /**
+     * Determine the days/times that we could execute this change. Start
+     * with any day being possible, then apply deadline, then apply rules.
+     * @param {array} other_new_changes - The other (new) changes to schedule
+     *                                    around
+     * @param {array} other_existing_changes - The other (already existing)
+     *                                         changes to schedule around
+     * @param {object} rules - The ACSRules object that contains all the logic
+     *                         for the scheduling rules. Will be used to cut
+     *                         down the possible days array from its baseline
+     */
+    find_possible_days: function(other_new_changes, other_existing_changes, rules)
+    {
+        this.create_baseline_possible_days();
+        this.apply_schedules_to_baseline_days(); // TODO: Should we call this function if we are a hot cut?
+        rules.apply_rules(this, other_new_changes, other_existing_changes);
+    }
+};]]></script>
+        <sys_class_name>sys_script_include</sys_class_name>
+        <sys_created_by>mcarter</sys_created_by>
+        <sys_created_on>2016-07-26 15:29:44</sys_created_on>
+        <sys_customer_update>true</sys_customer_update>
+        <sys_id>7c6c34ee4ff462008ea450ee0310c755</sys_id>
+        <sys_mod_count>188</sys_mod_count>
+        <sys_name>ACSChangeInstance</sys_name>
+        <sys_package display_value="ACS" source="x_exeg2_acs">58d89c1c13fca200e93cb16f3244b0d7</sys_package>
+        <sys_policy>read</sys_policy>
+        <sys_replace_on_upgrade>false</sys_replace_on_upgrade>
+        <sys_scope display_value="ACS">58d89c1c13fca200e93cb16f3244b0d7</sys_scope>
+        <sys_update_name>sys_script_include_7c6c34ee4ff462008ea450ee0310c755</sys_update_name>
+        <sys_updated_by>mcarter</sys_updated_by>
+        <sys_updated_on>2016-10-18 14:32:35</sys_updated_on>
+    </sys_script_include>
+</record_update>

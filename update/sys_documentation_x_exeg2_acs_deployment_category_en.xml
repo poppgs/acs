@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update>
+    <sys_documentation element="category" label="Deployment Category" language="en" table="x_exeg2_acs_deployment">
+        <sys_documentation action="INSERT_OR_UPDATE">
+            <element>category</element>
+            <help/>
+            <hint/>
+            <label>Deployment Category</label>
+            <language>en</language>
+            <name>x_exeg2_acs_deployment</name>
+            <plural>Deployment Categories</plural>
+            <sys_class_name>sys_documentation</sys_class_name>
+            <sys_created_by>mcarter</sys_created_by>
+            <sys_created_on>2016-09-21 15:51:11</sys_created_on>
+            <sys_customer_update>true</sys_customer_update>
+            <sys_id>ba74a6b0138e2640e93cb16f3244b099</sys_id>
+            <sys_mod_count>0</sys_mod_count>
+            <sys_name>Deployment Category</sys_name>
+            <sys_package display_value="ACS" source="x_exeg2_acs">58d89c1c13fca200e93cb16f3244b0d7</sys_package>
+            <sys_policy/>
+            <sys_replace_on_upgrade>false</sys_replace_on_upgrade>
+            <sys_scope display_value="ACS">58d89c1c13fca200e93cb16f3244b0d7</sys_scope>
+            <sys_update_name>sys_documentation_x_exeg2_acs_deployment_category_en</sys_update_name>
+            <sys_updated_by>mcarter</sys_updated_by>
+            <sys_updated_on>2016-09-21 15:51:11</sys_updated_on>
+            <url/>
+            <url_target/>
+        </sys_documentation>
+    </sys_documentation>
+</record_update>

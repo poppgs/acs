@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update>
+    <sys_choice action="INSERT_OR_UPDATE" field="type" table="x_exeg2_acs_appliances_to_schedules" version="3">
+        <sys_choice action="INSERT_OR_UPDATE">
+            <dependent_value/>
+            <element>type</element>
+            <hint/>
+            <inactive>false</inactive>
+            <label>blacklist</label>
+            <language>en</language>
+            <name>x_exeg2_acs_appliances_to_schedules</name>
+            <sequence/>
+            <sys_created_by>mcarter</sys_created_by>
+            <sys_created_on>2016-09-23 18:29:24</sys_created_on>
+            <sys_domain>global</sys_domain>
+            <sys_id>dcdbd1a1138e6640e93cb16f3244b092</sys_id>
+            <sys_mod_count>0</sys_mod_count>
+            <sys_updated_by>mcarter</sys_updated_by>
+            <sys_updated_on>2016-09-23 18:29:24</sys_updated_on>
+            <value>blacklist</value>
+        </sys_choice>
+        <sys_choice action="INSERT_OR_UPDATE">
+            <dependent_value/>
+            <element>type</element>
+            <hint/>
+            <inactive>false</inactive>
+            <label>maintenance</label>
+            <language>en</language>
+            <name>x_exeg2_acs_appliances_to_schedules</name>
+            <sequence/>
+            <sys_created_by>mcarter</sys_created_by>
+            <sys_created_on>2016-09-26 17:40:11</sys_created_on>
+            <sys_domain>global</sys_domain>
+            <sys_id>cd5de4ae13cea640e93cb16f3244b0fa</sys_id>
+            <sys_mod_count>0</sys_mod_count>
+            <sys_updated_by>mcarter</sys_updated_by>
+            <sys_updated_on>2016-09-26 17:40:11</sys_updated_on>
+            <value>maintenance</value>
+        </sys_choice>
+        <sys_choice action="INSERT_OR_UPDATE">
+            <dependent_value/>
+            <element>type</element>
+            <hint/>
+            <inactive>false</inactive>
+            <label>whitelist</label>
+            <language>en</language>
+            <name>x_exeg2_acs_appliances_to_schedules</name>
+            <sequence/>
+            <sys_created_by>mcarter</sys_created_by>
+            <sys_created_on>2016-09-23 18:29:46</sys_created_on>
+            <sys_domain>global</sys_domain>
+            <sys_id>a3ebd1a1138e6640e93cb16f3244b0e6</sys_id>
+            <sys_mod_count>0</sys_mod_count>
+            <sys_updated_by>mcarter</sys_updated_by>
+            <sys_updated_on>2016-09-23 18:29:46</sys_updated_on>
+            <value>whitelist</value>
+        </sys_choice>
+        <sys_choice_set action="INSERT_OR_UPDATE">
+            <element>type</element>
+            <name>x_exeg2_acs_appliances_to_schedules</name>
+            <sys_class_name>sys_choice_set</sys_class_name>
+            <sys_created_by>mcarter</sys_created_by>
+            <sys_created_on>2016-09-23 18:29:24</sys_created_on>
+            <sys_customer_update>false</sys_customer_update>
+            <sys_id>c0eb9961138e6640e93cb16f3244b05b</sys_id>
+            <sys_mod_count>3</sys_mod_count>
+            <sys_name>type</sys_name>
+            <sys_package display_value="ACS" source="x_exeg2_acs">58d89c1c13fca200e93cb16f3244b0d7</sys_package>
+            <sys_policy/>
+            <sys_replace_on_upgrade>false</sys_replace_on_upgrade>
+            <sys_scope display_value="ACS">58d89c1c13fca200e93cb16f3244b0d7</sys_scope>
+            <sys_update_name>sys_choice_x_exeg2_acs_appliances_to_schedules_type</sys_update_name>
+            <sys_updated_by>mcarter</sys_updated_by>
+            <sys_updated_on>2016-09-26 17:40:11</sys_updated_on>
+        </sys_choice_set>
+    </sys_choice>
+</record_update>

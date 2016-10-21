@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<database>
+    <element label="ACSLog" max_length="40" name="x_exeg2_acs_acslog" type="collection">
+        <element label="level" mandatory="true" max_length="40" name="level" type="string"/>
+        <element label="message" mandatory="true" max_length="2048" name="message" type="string"/>
+    </element>
+</database>

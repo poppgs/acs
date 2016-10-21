@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update>
+    <sys_ui_list parent="cmn_schedule" relationship="" sys_domain="global" table="cmn_schedule_span" version="2" view="">
+        <sys_ui_list_element action="INSERT_OR_UPDATE">
+            <average_value>false</average_value>
+            <element>name</element>
+            <list_id display_value="cmn_schedule_span" element="NULL" name="cmn_schedule_span" parent="cmn_schedule" relationship="NULL" sys_domain="global" view="Default view">32fa368fc0a801640077f420613a9d2e</list_id>
+            <max_value>false</max_value>
+            <min_value>false</min_value>
+            <position>0</position>
+            <sum>false</sum>
+            <sys_created_by>glide.maint</sys_created_by>
+            <sys_created_on>2008-02-19 18:35:01</sys_created_on>
+            <sys_id>32fa36a5c0a80164003e44629321f7a9</sys_id>
+            <sys_mod_count>0</sys_mod_count>
+            <sys_updated_by>glide.maint</sys_updated_by>
+            <sys_updated_on>2008-02-19 18:35:01</sys_updated_on>
+        </sys_ui_list_element>
+        <sys_ui_list_element action="INSERT_OR_UPDATE">
+            <average_value>false</average_value>
+            <element>repeat_type</element>
+            <list_id display_value="cmn_schedule_span" element="NULL" name="cmn_schedule_span" parent="cmn_schedule" relationship="NULL" sys_domain="global" view="Default view">32fa368fc0a801640077f420613a9d2e</list_id>
+            <max_value>false</max_value>
+            <min_value>false</min_value>
+            <position>1</position>
+            <sum>false</sum>
+            <sys_created_by>glide.maint</sys_created_by>
+            <sys_created_on>2008-02-19 18:35:01</sys_created_on>
+            <sys_id>32fa36b7c0a8016400d31f04ff558ace</sys_id>
+            <sys_mod_count>0</sys_mod_count>
+            <sys_updated_by>glide.maint</sys_updated_by>
+            <sys_updated_on>2008-02-19 18:35:01</sys_updated_on>
+        </sys_ui_list_element>
+        <sys_ui_list_element action="INSERT_OR_UPDATE">
+            <average_value>false</average_value>
+            <element>repeat_count</element>
+            <list_id display_value="cmn_schedule_span" element="NULL" name="cmn_schedule_span" parent="cmn_schedule" relationship="NULL" sys_domain="global" view="Default view">32fa368fc0a801640077f420613a9d2e</list_id>
+            <max_value>false</max_value>
+            <min_value>false</min_value>
+            <position>2</position>
+            <sum>false</sum>
+            <sys_created_by>glide.maint</sys_created_by>
+            <sys_created_on>2008-02-19 18:35:01</sys_created_on>
+            <sys_id>32fa36bac0a801640032fcb512bce4cd</sys_id>
+            <sys_mod_count>0</sys_mod_count>
+            <sys_updated_by>glide.maint</sys_updated_by>
+            <sys_updated_on>2008-02-19 18:35:01</sys_updated_on>
+        </sys_ui_list_element>
+        <sys_ui_list_element action="INSERT_OR_UPDATE">
+            <average_value>false</average_value>
+            <element>start_date_time</element>
+            <list_id display_value="cmn_schedule_span" element="NULL" name="cmn_schedule_span" parent="cmn_schedule" relationship="NULL" sys_domain="global" view="Default view">32fa368fc0a801640077f420613a9d2e</list_id>
+            <max_value>false</max_value>
+            <min_value>false</min_value>
+            <position>3</position>
+            <sum>false</sum>
+            <sys_created_by>glide.maint</sys_created_by>
+            <sys_created_on>2008-02-19 18:35:01</sys_created_on>
+            <sys_id>32fa36bdc0a80164001d74c281dcdb9b</sys_id>
+            <sys_mod_count>0</sys_mod_count>
+            <sys_updated_by>glide.maint</sys_updated_by>
+            <sys_updated_on>2008-02-19 18:35:01</sys_updated_on>
+        </sys_ui_list_element>
+        <sys_ui_list_element action="INSERT_OR_UPDATE">
+            <average_value>false</average_value>
+            <element>end_date_time</element>
+            <list_id display_value="cmn_schedule_span" element="NULL" name="cmn_schedule_span" parent="cmn_schedule" relationship="NULL" sys_domain="global" view="Default view">32fa368fc0a801640077f420613a9d2e</list_id>
+            <max_value>false</max_value>
+            <min_value>false</min_value>
+            <position>4</position>
+            <sum>false</sum>
+            <sys_created_by>glide.maint</sys_created_by>
+            <sys_created_on>2008-02-19 18:35:01</sys_created_on>
+            <sys_id>32fa36c0c0a8016400c97919f486b0fd</sys_id>
+            <sys_mod_count>0</sys_mod_count>
+            <sys_updated_by>glide.maint</sys_updated_by>
+            <sys_updated_on>2008-02-19 18:35:01</sys_updated_on>
+        </sys_ui_list_element>
+        <sys_ui_list action="INSERT_OR_UPDATE">
+            <average_value>false</average_value>
+            <element/>
+            <max_value>false</max_value>
+            <min_value>false</min_value>
+            <name>cmn_schedule_span</name>
+            <parent>cmn_schedule</parent>
+            <position/>
+            <relationship/>
+            <sum>false</sum>
+            <sys_class_name>sys_ui_list</sys_class_name>
+            <sys_created_by>mcarter</sys_created_by>
+            <sys_created_on>2016-09-30 20:01:01</sys_created_on>
+            <sys_customer_update>true</sys_customer_update>
+            <sys_domain>global</sys_domain>
+            <sys_id>5ef3b9774f4eea408ea450ee0310c700</sys_id>
+            <sys_mod_count>0</sys_mod_count>
+            <sys_name>cmn_schedule_span</sys_name>
+            <sys_package display_value="ACS" source="x_exeg2_acs">58d89c1c13fca200e93cb16f3244b0d7</sys_package>
+            <sys_policy/>
+            <sys_replace_on_upgrade>false</sys_replace_on_upgrade>
+            <sys_scope display_value="ACS">58d89c1c13fca200e93cb16f3244b0d7</sys_scope>
+            <sys_update_name>sys_ui_list_cmn_schedule_span_cmn_schedule_null</sys_update_name>
+            <sys_updated_by>mcarter</sys_updated_by>
+            <sys_updated_on>2016-09-30 20:01:01</sys_updated_on>
+            <sys_user display_value="Matthew Carter (mcarter)">3e2683fc6fd6650059d4a14d5d3ee4db</sys_user>
+            <view display_value="Default view" name="NULL">Default view</view>
+            <view_name/>
+        </sys_ui_list>
+    </sys_ui_list>
+</record_update>

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update table="sys_script_include">
+    <sys_script_include action="INSERT_OR_UPDATE">
+        <access>package_private</access>
+        <active>true</active>
+        <api_name>x_exeg2_acs.ACSLogger</api_name>
+        <client_callable>false</client_callable>
+        <description>Handles inserting log messages into the special ACS log table.</description>
+        <name>ACSLogger</name>
+        <script><![CDATA[var ACSLogger = Class.create();
+
+ACSLogger.prototype = {
+    /**
+     * Constructor, sets up the member variables
+     */
+    type: 'ACSLogger',        // Constant
+    initialize: function()
+    {
+        this.source = null;   // Denotes the source from which the log
+                              // messages are coming from
+    },
+
+
+    /**
+     * Sets the source instance variable so that when we log we can also show
+     * where the messages are coming from
+     */
+    set_source: function(src)
+    {
+        this.source = String(src);
+    },
+
+
+    /**
+     * Logs a message
+     * @param {string} level - String denoting the log-level of the message.
+     * @param {string} message - The log message
+     */
+     log: function(level, message)
+     {
+        var gr = new GlideRecord('x_exeg2_acs_acslog');
+
+        gr.level = String(level);
+
+        var msg = message;
+        if(this.source != null)
+        {
+            msg = this.source +': '+ message;
+        }
+        gr.message = msg;
+
+        var id = gr.insert();
+     }
+};]]></script>
+        <sys_class_name>sys_script_include</sys_class_name>
+        <sys_created_by>mcarter</sys_created_by>
+        <sys_created_on>2016-08-12 13:28:00</sys_created_on>
+        <sys_customer_update>true</sys_customer_update>
+        <sys_id>0641c40c4fd92a008ea450ee0310c71c</sys_id>
+        <sys_mod_count>3</sys_mod_count>
+        <sys_name>ACSLogger</sys_name>
+        <sys_package display_value="ACS" source="x_exeg2_acs">58d89c1c13fca200e93cb16f3244b0d7</sys_package>
+        <sys_policy>read</sys_policy>
+        <sys_replace_on_upgrade>false</sys_replace_on_upgrade>
+        <sys_scope display_value="ACS">58d89c1c13fca200e93cb16f3244b0d7</sys_scope>
+        <sys_update_name>sys_script_include_0641c40c4fd92a008ea450ee0310c71c</sys_update_name>
+        <sys_updated_by>mcarter</sys_updated_by>
+        <sys_updated_on>2016-08-12 15:57:05</sys_updated_on>
+    </sys_script_include>
+</record_update>

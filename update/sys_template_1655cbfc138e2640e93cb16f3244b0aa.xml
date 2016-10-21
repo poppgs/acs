@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update table="sys_template">
+    <sys_template action="INSERT_OR_UPDATE">
+        <active>true</active>
+        <global>false</global>
+        <group/>
+        <link_element/>
+        <name>acs_fw_upgrade</name>
+        <next/>
+        <next_child/>
+        <roles/>
+        <short_description/>
+        <show_on_template_bar>true</show_on_template_bar>
+        <stand_alone>false</stand_alone>
+        <sys_class_name>sys_template</sys_class_name>
+        <sys_created_by>mcarter</sys_created_by>
+        <sys_created_on>2016-09-21 18:18:02</sys_created_on>
+        <sys_customer_update>true</sys_customer_update>
+        <sys_id>1655cbfc138e2640e93cb16f3244b0aa</sys_id>
+        <sys_mod_count>2</sys_mod_count>
+        <sys_name>acs_fw_upgrade</sys_name>
+        <sys_package display_value="ACS" source="x_exeg2_acs">58d89c1c13fca200e93cb16f3244b0d7</sys_package>
+        <sys_policy/>
+        <sys_replace_on_upgrade>false</sys_replace_on_upgrade>
+        <sys_scope display_value="ACS">58d89c1c13fca200e93cb16f3244b0d7</sys_scope>
+        <sys_update_name>sys_template_1655cbfc138e2640e93cb16f3244b0aa</sys_update_name>
+        <sys_updated_by>puppet_robot</sys_updated_by>
+        <sys_updated_on>2016-10-07 15:35:06</sys_updated_on>
+        <table>change_request</table>
+        <template>change_plan=# Run pre-change snapshots:&#13;
+&#13;
+(echo __CHG_NUMBER__ ; echo 1) | xtp-snap&#13;
+&#13;
+# Update repos and set upstream repository location:&#13;
+&#13;
+# Verify commit has made it to the system:&#13;
+&#13;
+cd /usr/local/exegy/puppet/data ; git describe --all __COMMIT__&#13;
+&#13;
+# Stop exelerate:&#13;
+&#13;
+if [ `mdc-info -main | grep -c Started` -ne 1 ]; then echo 'mdc-info is not responding, press ENTER to continue or press CTRL+C to exit.'; read; fi&#13;
+echo $HOSTNAME | estop&#13;
+&#13;
+# Backup persist:&#13;
+&#13;
+if [ -s /export0/archive/Pre___CHG_NUMBER__.tgz ];then echo "File already exists /export0/archive/Pre___CHG_NUMBER__.tgz"; else tar czvf /export0/archive/Pre___CHG_NUMBER__.tgz /usr/local/exegy/mdc ; fi&#13;
+&#13;
+# Run puppet:&#13;
+&#13;
+xpuppet -p&#13;
+&#13;
+# Start exelerate:&#13;
+&#13;
+estart^backout_plan=Escalate to MSE^u_acs_ref=^short_description=ACS change for upgrading to firmware version: __VERSION__^u_business_objective=To update to firmware version __VERSION__^assignment_group=0148f7bb6fb7a100b13653a11c3ee41d^u_category=1daa2f626f3835005318eef11c3ee4e7^state=13^reason=^description=ACS change for firmware __VERSION__^u_expedited=false^u_expedite_justification=^u_workflow_state=exec_approval^EQ</template>
+        <user display_value="Matthew Carter (mcarter)">3e2683fc6fd6650059d4a14d5d3ee4db</user>
+        <view/>
+    </sys_template>
+</record_update>
