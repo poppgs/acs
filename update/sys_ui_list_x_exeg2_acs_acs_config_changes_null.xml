@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update>
+    <sys_ui_list parent="" relationship="" sys_domain="global" table="x_exeg2_acs_acs_config_changes" version="2" view="">
+        <sys_ui_list_element action="INSERT_OR_UPDATE">
+            <average_value>false</average_value>
+            <element>change_request</element>
+            <list_id display_value="x_exeg2_acs_acs_config_changes" element="NULL" name="x_exeg2_acs_acs_config_changes" parent="NULL" relationship="NULL" sys_domain="global" view="Default view">8ef940274f222a008ea450ee0310c7f0</list_id>
+            <max_value>false</max_value>
+            <min_value>false</min_value>
+            <position>0</position>
+            <sum>false</sum>
+            <sys_created_by>mcarter</sys_created_by>
+            <sys_created_on>2016-10-24 14:10:48</sys_created_on>
+            <sys_id>82f940274f222a008ea450ee0310c7f1</sys_id>
+            <sys_mod_count>0</sys_mod_count>
+            <sys_updated_by>mcarter</sys_updated_by>
+            <sys_updated_on>2016-10-24 14:10:48</sys_updated_on>
+        </sys_ui_list_element>
+        <sys_ui_list_element action="INSERT_OR_UPDATE">
+            <average_value>false</average_value>
+            <element>changes</element>
+            <list_id display_value="x_exeg2_acs_acs_config_changes" element="NULL" name="x_exeg2_acs_acs_config_changes" parent="NULL" relationship="NULL" sys_domain="global" view="Default view">8ef940274f222a008ea450ee0310c7f0</list_id>
+            <max_value>false</max_value>
+            <min_value>false</min_value>
+            <position>1</position>
+            <sum>false</sum>
+            <sys_created_by>mcarter</sys_created_by>
+            <sys_created_on>2016-10-24 14:10:48</sys_created_on>
+            <sys_id>06f940274f222a008ea450ee0310c7f1</sys_id>
+            <sys_mod_count>0</sys_mod_count>
+            <sys_updated_by>mcarter</sys_updated_by>
+            <sys_updated_on>2016-10-24 14:10:48</sys_updated_on>
+        </sys_ui_list_element>
+        <sys_ui_list_element action="INSERT_OR_UPDATE">
+            <average_value>false</average_value>
+            <element>description</element>
+            <list_id display_value="x_exeg2_acs_acs_config_changes" element="NULL" name="x_exeg2_acs_acs_config_changes" parent="NULL" relationship="NULL" sys_domain="global" view="Default view">8ef940274f222a008ea450ee0310c7f0</list_id>
+            <max_value>false</max_value>
+            <min_value>false</min_value>
+            <position>2</position>
+            <sum>false</sum>
+            <sys_created_by>mcarter</sys_created_by>
+            <sys_created_on>2016-10-24 14:10:48</sys_created_on>
+            <sys_id>86f940274f222a008ea450ee0310c7f1</sys_id>
+            <sys_mod_count>0</sys_mod_count>
+            <sys_updated_by>mcarter</sys_updated_by>
+            <sys_updated_on>2016-10-24 14:10:48</sys_updated_on>
+        </sys_ui_list_element>
+        <sys_ui_list_element action="INSERT_OR_UPDATE">
+            <average_value>false</average_value>
+            <element>target_file</element>
+            <list_id display_value="x_exeg2_acs_acs_config_changes" element="NULL" name="x_exeg2_acs_acs_config_changes" parent="NULL" relationship="NULL" sys_domain="global" view="Default view">8ef940274f222a008ea450ee0310c7f0</list_id>
+            <max_value>false</max_value>
+            <min_value>false</min_value>
+            <position>3</position>
+            <sum>false</sum>
+            <sys_created_by>mcarter</sys_created_by>
+            <sys_created_on>2016-10-24 14:10:48</sys_created_on>
+            <sys_id>0af940274f222a008ea450ee0310c7f1</sys_id>
+            <sys_mod_count>0</sys_mod_count>
+            <sys_updated_by>mcarter</sys_updated_by>
+            <sys_updated_on>2016-10-24 14:10:48</sys_updated_on>
+        </sys_ui_list_element>
+        <sys_ui_list action="INSERT_OR_UPDATE">
+            <average_value>false</average_value>
+            <element/>
+            <max_value>false</max_value>
+            <min_value>false</min_value>
+            <name>x_exeg2_acs_acs_config_changes</name>
+            <parent/>
+            <position/>
+            <relationship/>
+            <sum>false</sum>
+            <sys_class_name>sys_ui_list</sys_class_name>
+            <sys_created_by>mcarter</sys_created_by>
+            <sys_created_on>2016-10-24 14:10:48</sys_created_on>
+            <sys_customer_update>true</sys_customer_update>
+            <sys_domain>global</sys_domain>
+            <sys_id>8ef940274f222a008ea450ee0310c7f0</sys_id>
+            <sys_mod_count>0</sys_mod_count>
+            <sys_name>x_exeg2_acs_acs_config_changes</sys_name>
+            <sys_package display_value="ACS" source="x_exeg2_acs">58d89c1c13fca200e93cb16f3244b0d7</sys_package>
+            <sys_policy/>
+            <sys_replace_on_upgrade>false</sys_replace_on_upgrade>
+            <sys_scope display_value="ACS">58d89c1c13fca200e93cb16f3244b0d7</sys_scope>
+            <sys_update_name>sys_ui_list_x_exeg2_acs_acs_config_changes_null</sys_update_name>
+            <sys_updated_by>mcarter</sys_updated_by>
+            <sys_updated_on>2016-10-24 14:10:48</sys_updated_on>
+            <sys_user/>
+            <view display_value="Default view" name="NULL">Default view</view>
+            <view_name/>
+        </sys_ui_list>
+    </sys_ui_list>
+</record_update>

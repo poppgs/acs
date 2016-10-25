@@ -144,9 +144,14 @@ ACSHighLevelHelper.prototype = {
 
         var appliance_query = new GlideRecord("x_exeg2_cmdb_appliance");
         appliance_query.addQuery('operational_status', 1);
-        // Limit the appliances received to xtp and mds appliance types
-        // TODO: We may need to remove this limitation in the future:
-        appliance_query.addQuery('u_appliance_type', 'IN', '7aea980e4fc592004b8658211310c7da,3eea980e4fc592004b8658211310c7d9');
+
+        // Limit the appliances received to xtp, mds, and xec
+        var allowed_appliance_types = [];
+        allowed_appliance_types.push('7aea980e4fc592004b8658211310c7da'); // xtp
+        allowed_appliance_types.push('3eea980e4fc592004b8658211310c7d9'); // mds
+        allowed_appliance_types.push('b6ea980e4fc592004b8658211310c7da'); // xec
+
+        appliance_query.addQuery('u_appliance_type', 'IN', allowed_appliance_types.join(','));
         
         if(target_appliances && String(target_appliances) != '')
         {
@@ -160,11 +165,13 @@ ACSHighLevelHelper.prototype = {
         while(appliance_query.next())
         {
             var a = {};
+            // TODO: Add type
             a.name = String(appliance_query.u_legacy_name);
             a.sys_id = String(appliance_query.sys_id);
             a.company = String(appliance_query.company.getDisplayValue());
             a.location = String(appliance_query.location.getDisplayValue());
             a.firmware_version = String(appliance_query.u_firmware_version);
+            a.u_appliance_type = String(appliance_query.u_appliance_type.getDisplayValue());
             a.u_exegy_deployment = String(appliance_query.u_exegy_deployment.getDisplayValue());
             a.operational_status = parseInt(appliance_query.operational_status);
             a.change_dependencies = [];
@@ -489,7 +496,7 @@ ACSHighLevelHelper.prototype = {
         <sys_created_on>2016-08-30 19:47:05</sys_created_on>
         <sys_customer_update>true</sys_customer_update>
         <sys_id>9f22827513e92e00e93cb16f3244b06d</sys_id>
-        <sys_mod_count>48</sys_mod_count>
+        <sys_mod_count>50</sys_mod_count>
         <sys_name>ACSHighLevelHelper</sys_name>
         <sys_package display_value="ACS" source="x_exeg2_acs">58d89c1c13fca200e93cb16f3244b0d7</sys_package>
         <sys_policy>read</sys_policy>
@@ -497,6 +504,6 @@ ACSHighLevelHelper.prototype = {
         <sys_scope display_value="ACS">58d89c1c13fca200e93cb16f3244b0d7</sys_scope>
         <sys_update_name>sys_script_include_9f22827513e92e00e93cb16f3244b06d</sys_update_name>
         <sys_updated_by>mcarter</sys_updated_by>
-        <sys_updated_on>2016-10-20 20:36:31</sys_updated_on>
+        <sys_updated_on>2016-10-25 13:35:45</sys_updated_on>
     </sys_script_include>
 </record_update>

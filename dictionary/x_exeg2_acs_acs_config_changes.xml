@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<database>
+    <element label="ACS Config Changes" max_length="40" name="x_exeg2_acs_acs_config_changes" type="collection">
+        <element label="Changes" mandatory="true" max_length="8192" name="changes" type="string"/>
+        <element label="Change Request" mandatory="true" max_length="32" name="change_request" reference="change_request" type="reference"/>
+        <element label="Description" max_length="2048" name="description" type="string"/>
+        <element label="Target File" mandatory="true" max_length="64" name="target_file" type="string"/>
+        <index name="index">
+            <element name="change_request"/>
+        </index>
+    </element>
+</database>

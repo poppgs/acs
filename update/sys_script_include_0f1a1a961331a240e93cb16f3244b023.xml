@@ -18,9 +18,18 @@ ACSScheduler.prototype = {
         this.logger = new ACSLogger();
         this.logger.set_source('ACSScheduler');
 
-        this.deployment_category_to_template_id = {
-            'Feed Handler': '4cca50014f91aa008ea450ee0310c71c',
-            'Firmware': '1655cbfc138e2640e93cb16f3244b0aa'
+        this.template_id_map = {
+            'xtp': {
+                'Feed Handler': '4cca50014f91aa008ea450ee0310c71c',
+                'Firmware': '1655cbfc138e2640e93cb16f3244b0aa'
+            },
+            'mds': {
+                'Feed Handler': '4cca50014f91aa008ea450ee0310c71c',
+                'Firmware': '1655cbfc138e2640e93cb16f3244b0aa'
+            },
+            'xec': {
+                'Firmware': 'af3b593f4fa62a008ea450ee0310c7c9'
+            }            
         };
     },
 
@@ -258,11 +267,12 @@ ACSScheduler.prototype = {
             // Create a templater object that will help fill in the contents of
             // our changes
             var templater = new ACSTemplater();
-            var template_id = this.deployment_category_to_template_id[deployment_category];
+            var template_id = null;
 
             // Add the newly scheduled change instances to SNOW
             for(i = 0; i < changes_to_schedule.length; i++)
             {
+                template_id = this.template_id_map[changes_to_schedule[i].appliance.u_appliance_type][deployment_category];
                 scheduled_change_ids.push(changes_to_schedule[i].add_to_snow(templater, template_id));
             }
         }
@@ -283,7 +293,7 @@ ACSScheduler.prototype = {
         <sys_created_on>2016-09-13 20:41:37</sys_created_on>
         <sys_customer_update>true</sys_customer_update>
         <sys_id>0f1a1a961331a240e93cb16f3244b023</sys_id>
-        <sys_mod_count>20</sys_mod_count>
+        <sys_mod_count>22</sys_mod_count>
         <sys_name>ACSScheduler</sys_name>
         <sys_package display_value="ACS" source="x_exeg2_acs">58d89c1c13fca200e93cb16f3244b0d7</sys_package>
         <sys_policy>read</sys_policy>
@@ -291,6 +301,6 @@ ACSScheduler.prototype = {
         <sys_scope display_value="ACS">58d89c1c13fca200e93cb16f3244b0d7</sys_scope>
         <sys_update_name>sys_script_include_0f1a1a961331a240e93cb16f3244b023</sys_update_name>
         <sys_updated_by>mcarter</sys_updated_by>
-        <sys_updated_on>2016-10-20 20:51:22</sys_updated_on>
+        <sys_updated_on>2016-10-25 15:17:56</sys_updated_on>
     </sys_script_include>
 </record_update>

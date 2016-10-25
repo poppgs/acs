@@ -107,6 +107,53 @@ ACSChangeInstance.prototype = {
 
 
     /**
+     * Function to create the next content of a CR's validation plan and return
+     * it.
+     * @param {string} category - The category of the CR
+     */
+    make_cr_validation: function(category)
+    {
+        var validation = '';
+        var i = 0;
+
+        if(category == 'Firmware')
+        {
+            for(i = 0; i < this.deployment.deployment_items.length; i++)
+            {
+                var di = this.deployment.deployment_items[i];
+
+                if(di.type === 'feedhandler' && this.appliance.u_appliance_type != 'xec')
+                {
+                    validation += '\nrpmqaout=`rpm -qa | grep -i '+ di.name +'`; if [ `echo $rpmqaout | grep -ce '+ di.value +'` -gt 0 ]; then echo -e "\\e[0;32mSUCCESS: $rpmqaout\\e[0m"; else echo -e "\\e[0;31mFAILED: $rpmqaout\\e[0m"; fi';
+                }
+                else if(di.type === 'firmware' && this.appliance.u_appliance_type != 'xec')
+                {
+                    validation += '\nrpmqaout=`rpm -qa | grep -i Exegy-TickerPlant`; if [ `echo $rpmqaout | grep -ce '+ di.value +'` -gt 0 ]; then echo -e "\\e[0;32mSUCCESS: $rpmqaout\\e[0m"; else echo -e "\\e[0;31mFAILED: $rpmqaout\\e[0m"; fi';
+                }
+                else if(di.type === 'xec_firmware' && this.appliance.u_appliance_type == 'xec')
+                {
+                    validation += '\nrpmqaout=`rpm -qa | grep -i Exegy-TCP-Gateway`; if [ `echo $rpmqaout | grep -ce '+ di.value +'` -gt 0 ]; then echo -e "\\e[0;32mSUCCESS: $rpmqaout\\e[0m"; else echo -e "\\e[0;31mFAILED: $rpmqaout\\e[0m"; fi';
+                }
+                else if(di.type === 'configs_rpm' && this.appliance.u_appliance_type != 'xec')
+                {
+                    validation += '\nrpmqaout=`rpm -qa | grep -i Exegy-Configs`; if [ `echo $rpmqaout | grep -ce '+ di.value +'` -gt 0 ]; then echo -e "\\e[0;32mSUCCESS: $rpmqaout\\e[0m"; else echo -e "\\e[0;31mFAILED: $rpmqaout\\e[0m"; fi';
+                }
+                else if(di.type === 'xec_configs_rpm' && this.appliance.u_appliance_type == 'xec')
+                {
+                    validation += '\nrpmqaout=`rpm -qa | grep -i Exegy-Configs`; if [ `echo $rpmqaout | grep -ce '+ di.value +'` -gt 0 ]; then echo -e "\\e[0;32mSUCCESS: $rpmqaout\\e[0m"; else echo -e "\\e[0;31mFAILED: $rpmqaout\\e[0m"; fi';
+                }
+                else if(di.type === 'immutable' && di.name == this.appliance.name)
+                {
+                    validation += '\nrdlnkout=`readlink /usr/local/exegy/config/libconf-exegy.so`; if [ `echo $rdlnkout | grep -ce '+ di.value +'` -gt 0 ]; then echo -e "\\e[0;32mSUCCESS: $rdlnkout\\e[0m"; else echo -e "\\e[0;31mFAILED: $rdlnkout\\e[0m"; fi';
+                }
+            }
+        }
+
+        return validation.replace('\n', '');
+    },
+
+
+    /**
      * Function to store a record of this change instance in service now
      * @param {ACSTemplater} templater - An ACSTemplater object that will help
      *                                   fill in content for this change
@@ -132,32 +179,57 @@ ACSChangeInstance.prototype = {
         gr.cmdb_ci = this.appliance.sys_id;
         gr.u_acs_ref = this.deployment.id;
 
+        var template_version = this.deployment.version;
+
         // Put in some metadata for other automated processes to use down
         // the line
         var meta = {};
         meta.deployment_category = String(this.deployment.category);
+        meta.items = [];
+
+        if(meta.deployment_category == 'Firmware')
+        {
+            // If we are a firmware version and we are an edge cache make sure
+            // we use the correct version for things
+            if(this.appliance.u_appliance_type == 'xec')
+            {
+                for(i = 0; i < this.deployment.deployment_items.length; i++)
+                {
+                    if(this.deployment.deployment_items[i].type == 'xec_firmware')
+                    {
+                        template_version = this.deployment.deployment_items[i].value;
+                    }
+                }
+            }
+        }
+
+        for(i = 0; i < this.deployment.deployment_items.length; i++)
+        {
+            var item = {};
+            item.type = this.deployment.deployment_items[i].type;
+            item.name = this.deployment.deployment_items[i].name;
+            item.value = this.deployment.deployment_items[i].value;
+
+            // Giant IF block for not doing certain things depending on XECs
+            // (stupid)
+            if((item.type != 'feedhandler' || this.appliance.u_appliance_type != 'xec') &&
+               (item.type != 'configs_rpm' || this.appliance.u_appliance_type != 'xec') &&
+               (item.type != 'immutable' || this.appliance.name == item.name) &&
+               (item.type != 'xec_firmware' || this.appliance.u_appliance_type == 'xec') &&
+               (item.type != 'firmware' || this.appliance.u_appliance_type != 'xec') &&
+               (item.type != 'xec_configs_rpm' || this.appliance.u_appliance_type == 'xec'))
+            {
+                meta.items.push(item);
+            }
+        }
+        
         if(meta.deployment_category == 'Feed Handler')
         {
             meta.name = String(this.deployment.name);
             meta.version = String(this.deployment.version);
             meta.firmware_version = String(this.deployment.firmware_version);
         }
-        else
-        {
-            meta.items = [];
-            for(i = 0; i < this.deployment.deployment_items.length; i++)
-            {
-                var item = {};
-                item.type = this.deployment.deployment_items[i].type;
-                if(item.type !== 'config_changes_description')
-                {
-                    item.name = this.deployment.deployment_items[i].name;
-                    item.value = this.deployment.deployment_items[i].value;
-
-                    meta.items.push(item);
-                }
-            }
-        }
+        
         gr.test_plan = JSON.stringify(meta);
 
         // Insert so we can get a change number
@@ -166,7 +238,7 @@ ACSChangeInstance.prototype = {
         // Apply the template
         var substitutions = {
             '__CHG_NUMBER__': gr.number,
-            '__VERSION__': this.deployment.version,
+            '__VERSION__': template_version,
             '__FH_NAME__': this.deployment.name
         };
         templater.apply_template(gr, template_id, substitutions);
@@ -183,47 +255,16 @@ ACSChangeInstance.prototype = {
                 // Put the description of the changes needed int he work notes
                 gr.work_notes = 'Config changes must be made in order to complete this change:<br/>'+di.value;
                 gr.assignment_group = '05c7e1c96fa131005318eef11c3ee4f7';
-                gr.assigned_to = 'ce29766c6f69524059d4a14d5d3ee4c9';
+                gr.assigned_to = '2e2683fc6fd6650059d4a14d5d3ee4d1';
+                gr.state = 'Pending RFC Acceptance';
             }
         }
 
-        
-        if(meta.deployment_category == 'Firmware')
+        var validation = this.make_cr_validation(meta.deployment_category);
+        if(validation != '')
         {
-            // SPECIAL CASE
-            // We can generate a very nice validation plan using all of our
-            // metadata
-            var validation = '';
-            for(i = 0; i < this.deployment.deployment_items.length; i++)
-            {
-                var di = this.deployment.deployment_items[i];
-
-                if(di.type !== 'config_changes_description' && i)
-                {
-                    validation += '\n';
-                }
-
-                if(di.type === 'feedhandler')
-                {
-                    validation += 'rpmqaout=`rpm -qa | grep -i '+ di.name +'`; if [ `echo $rpmqaout | grep -ce '+ di.value +'` -gt 0 ]; then echo -e "\\e[0;32mSUCCESS: $rpmqaout\\e[0m"; else echo -e "\\e[0;31mFAILED: $rpmqaout\\e[0m"; fi';
-                }
-                else if(di.type === 'firmware')
-                {
-                    validation += 'rpmqaout=`rpm -qa | grep -i Exegy-TickerPlant`; if [ `echo $rpmqaout | grep -ce '+ di.value +'` -gt 0 ]; then echo -e "\\e[0;32mSUCCESS: $rpmqaout\\e[0m"; else echo -e "\\e[0;31mFAILED: $rpmqaout\\e[0m"; fi';
-                }
-                else if(di.type === 'configs_rpm')
-                {
-                    validation += 'rpmqaout=`rpm -qa | grep -i Exegy-Configs`; if [ `echo $rpmqaout | grep -ce '+ di.value +'` -gt 0 ]; then echo -e "\\e[0;32mSUCCESS: $rpmqaout\\e[0m"; else echo -e "\\e[0;31mFAILED: $rpmqaout\\e[0m"; fi';
-                }
-                else if(di.type === 'immutable' && di.name == this.appliance.name)
-                {
-                    validation += 'rdlnkout=`readlink /usr/local/exegy/config/libconf-exegy.so`; if [ `echo $rdlnkout | grep -ce '+ di.value +'` -gt 0 ]; then echo -e "\\e[0;32mSUCCESS: $rdlnkout\\e[0m"; else echo -e "\\e[0;31mFAILED: $rdlnkout\\e[0m"; fi';
-                }
-            }
-
             gr.u_validation_plan = validation;
         }
-
 
         // Update now that we have applied the template
         gr.update();
@@ -898,7 +939,7 @@ ACSChangeInstance.prototype = {
         <sys_created_on>2016-07-26 15:29:44</sys_created_on>
         <sys_customer_update>true</sys_customer_update>
         <sys_id>7c6c34ee4ff462008ea450ee0310c755</sys_id>
-        <sys_mod_count>188</sys_mod_count>
+        <sys_mod_count>202</sys_mod_count>
         <sys_name>ACSChangeInstance</sys_name>
         <sys_package display_value="ACS" source="x_exeg2_acs">58d89c1c13fca200e93cb16f3244b0d7</sys_package>
         <sys_policy>read</sys_policy>
@@ -906,6 +947,6 @@ ACSChangeInstance.prototype = {
         <sys_scope display_value="ACS">58d89c1c13fca200e93cb16f3244b0d7</sys_scope>
         <sys_update_name>sys_script_include_7c6c34ee4ff462008ea450ee0310c755</sys_update_name>
         <sys_updated_by>mcarter</sys_updated_by>
-        <sys_updated_on>2016-10-18 14:32:35</sys_updated_on>
+        <sys_updated_on>2016-10-25 15:55:23</sys_updated_on>
     </sys_script_include>
 </record_update>

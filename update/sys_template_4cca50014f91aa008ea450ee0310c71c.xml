@@ -17,7 +17,7 @@
         <sys_created_on>2016-08-15 17:45:50</sys_created_on>
         <sys_customer_update>true</sys_customer_update>
         <sys_id>4cca50014f91aa008ea450ee0310c71c</sys_id>
-        <sys_mod_count>5</sys_mod_count>
+        <sys_mod_count>6</sys_mod_count>
         <sys_name>acs_fh_upgrade</sys_name>
         <sys_package display_value="ACS" source="x_exeg2_acs">58d89c1c13fca200e93cb16f3244b0d7</sys_package>
         <sys_policy/>
@@ -25,7 +25,7 @@
         <sys_scope display_value="ACS">58d89c1c13fca200e93cb16f3244b0d7</sys_scope>
         <sys_update_name>sys_template_4cca50014f91aa008ea450ee0310c71c</sys_update_name>
         <sys_updated_by>mcarter</sys_updated_by>
-        <sys_updated_on>2016-08-24 13:49:46</sys_updated_on>
+        <sys_updated_on>2016-10-25 15:35:38</sys_updated_on>
         <table>change_request</table>
         <template>change_plan=# Run pre-change snapshots:&#13;
 &#13;
@@ -79,7 +79,7 @@ estart&#13;
 &#13;
 # Verify feedhandler version:&#13;
 &#13;
-mdc-info -lines -full | grep -A1 __FH_NAME__ | grep 'Handler Ver:' | uniq | grep -c __VERSION__^short_description=ACS change for __FH_NAME__ __VERSION__^u_business_objective=To install or update __FH_NAME__ to version __VERSION__^assignment_group=0148f7bb6fb7a100b13653a11c3ee41d^u_category=629a2f626f3835005318eef11c3ee42d^state=13^reason=^description=ACS change for __FH_NAME__ __VERSION__^u_expedited=false^u_expedite_justification=^u_workflow_state=exec_approval^EQ</template>
+mdc-info -lines -full | grep -A1 __FH_NAME__ | grep 'Handler Ver:' | uniq | grep -c __VERSION__^short_description=ACS change for __FH_NAME__ __VERSION__^u_business_objective=To install or update __FH_NAME__ to version __VERSION__^assignment_group=0148f7bb6fb7a100b13653a11c3ee41d^u_category=629a2f626f3835005318eef11c3ee42d^state=13^reason=^description=ACS change for __FH_NAME__ __VERSION__^u_expedited=false^u_expedite_justification=^u_workflow_state=^EQ</template>
         <user display_value="Matthew Carter (mcarter)">3e2683fc6fd6650059d4a14d5d3ee4db</user>
         <view/>
     </sys_template>
