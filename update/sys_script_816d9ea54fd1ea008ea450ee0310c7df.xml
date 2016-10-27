@@ -82,7 +82,9 @@
         var deployment_items_deleted = delete_deployment_items();
         var changes_deleted = delete_changes();
 
-        gs.addInfoMessage("Deleted "+deployment_items_deleted+" Deployment Items and "+changes_deleted+" Change Requests");
+        var msg = "Deleted "+deployment_items_deleted+" Deployment Items and "+changes_deleted+" Change Requests";
+        gs.addInfoMessage(msg);
+        gs.info(msg);
     }
     catch (err)
     {
@@ -96,7 +98,7 @@
         <sys_customer_update>true</sys_customer_update>
         <sys_domain>global</sys_domain>
         <sys_id>816d9ea54fd1ea008ea450ee0310c7df</sys_id>
-        <sys_mod_count>1</sys_mod_count>
+        <sys_mod_count>2</sys_mod_count>
         <sys_name>Cascade Delete</sys_name>
         <sys_overrides/>
         <sys_package display_value="ACS" source="x_exeg2_acs">58d89c1c13fca200e93cb16f3244b0d7</sys_package>
@@ -105,7 +107,7 @@
         <sys_scope display_value="ACS">58d89c1c13fca200e93cb16f3244b0d7</sys_scope>
         <sys_update_name>sys_script_816d9ea54fd1ea008ea450ee0310c7df</sys_update_name>
         <sys_updated_by>mcarter</sys_updated_by>
-        <sys_updated_on>2016-09-28 20:28:17</sys_updated_on>
+        <sys_updated_on>2016-10-27 14:23:13</sys_updated_on>
         <template/>
         <when>before</when>
     </sys_script>

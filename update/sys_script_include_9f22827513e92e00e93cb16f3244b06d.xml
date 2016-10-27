@@ -85,9 +85,7 @@ ACSHighLevelHelper.prototype = {
         //   in the future will need to be aggregated from these new sources.
         var config = {
             day_in_ms: (24 * 60 * 60 * 1000), // Doesn't really need to live in the config, but it is convienient
-            dev_appliance_day_offset: 5,      // Number of days that should be between an identical change on a dev/test/UAT appliance and it's primary pair
-            primary_backup_day_offset: 2,     // Number of days that should be between an identical change on a primary and backup appliance pair
-            max_acs_changes_per_day: 20,      // Max number of changes that can be placed on a single day TODO: What should this value be?
+            max_changes_per_day: 100,         // Max number of changes that can be placed on a single day TODO: What should this value be?
             same_day_ms_threshold: (1000 * 60 * 60 * 23) // 23 hours. How many ms a change must be away from another to be considered on a different "day"
         };
 
@@ -496,7 +494,7 @@ ACSHighLevelHelper.prototype = {
         <sys_created_on>2016-08-30 19:47:05</sys_created_on>
         <sys_customer_update>true</sys_customer_update>
         <sys_id>9f22827513e92e00e93cb16f3244b06d</sys_id>
-        <sys_mod_count>50</sys_mod_count>
+        <sys_mod_count>51</sys_mod_count>
         <sys_name>ACSHighLevelHelper</sys_name>
         <sys_package display_value="ACS" source="x_exeg2_acs">58d89c1c13fca200e93cb16f3244b0d7</sys_package>
         <sys_policy>read</sys_policy>
@@ -504,6 +502,6 @@ ACSHighLevelHelper.prototype = {
         <sys_scope display_value="ACS">58d89c1c13fca200e93cb16f3244b0d7</sys_scope>
         <sys_update_name>sys_script_include_9f22827513e92e00e93cb16f3244b06d</sys_update_name>
         <sys_updated_by>mcarter</sys_updated_by>
-        <sys_updated_on>2016-10-25 13:35:45</sys_updated_on>
+        <sys_updated_on>2016-10-27 14:23:56</sys_updated_on>
     </sys_script_include>
 </record_update>

@@ -17,7 +17,7 @@
         <sys_created_on>2016-10-25 15:17:15</sys_created_on>
         <sys_customer_update>true</sys_customer_update>
         <sys_id>af3b593f4fa62a008ea450ee0310c7c9</sys_id>
-        <sys_mod_count>2</sys_mod_count>
+        <sys_mod_count>3</sys_mod_count>
         <sys_name>acs_xec_fw_upgrade</sys_name>
         <sys_package display_value="ACS" source="x_exeg2_acs">58d89c1c13fca200e93cb16f3244b0d7</sys_package>
         <sys_policy/>
@@ -25,7 +25,7 @@
         <sys_scope display_value="ACS">58d89c1c13fca200e93cb16f3244b0d7</sys_scope>
         <sys_update_name>sys_template_af3b593f4fa62a008ea450ee0310c7c9</sys_update_name>
         <sys_updated_by>mcarter</sys_updated_by>
-        <sys_updated_on>2016-10-25 15:35:26</sys_updated_on>
+        <sys_updated_on>2016-10-27 16:00:51</sys_updated_on>
         <table>change_request</table>
         <template>change_plan=1. Run pre-change snapshots:&#13;
 &#13;
@@ -62,7 +62,7 @@ cd /usr/local/exegy/puppet/data ; git describe --all __COMMIT__&#13;
 6. Start Exegy gateway service&#13;
     chkconfig exegygateway on&#13;
     service exegygatway start&#13;
-^backout_plan=Escalate to MSE^short_description=ACS change for upgrading to firmware version: __VERSION__^u_business_objective=To update to firmware version __VERSION__^assignment_group=0148f7bb6fb7a100b13653a11c3ee41d^u_category=1daa2f626f3835005318eef11c3ee4e7^state=13^reason=^description=ACS change for firmware __VERSION__^u_expedited=false^u_expedite_justification=^u_workflow_state=^EQ</template>
+^backout_plan=Escalate to MSE^short_description=ACS change for upgrading to firmware version: __VERSION__^u_business_objective=To update to firmware version __VERSION__^assignment_group=0148f7bb6fb7a100b13653a11c3ee41d^u_category=1daa2f626f3835005318eef11c3ee4e7^state=13^reason=^description=ACS change for firmware __VERSION__^u_expedited=false^u_expedite_justification=^u_workflow_state=^approval=requested^EQ</template>
         <user display_value="Matthew Carter (mcarter)">3e2683fc6fd6650059d4a14d5d3ee4db</user>
         <view/>
     </sys_template>

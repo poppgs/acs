@@ -170,7 +170,7 @@ ACSRules.prototype = {
         // If our last character is not a or b, just return.
         // This should probably be looking at a different field in the
         // appliance data to determine this.
-        var last_char = String(target_change.appliance.name[target_change.appliance.name.length - 1]).toLowerCase();
+        var last_char = String(target_change.appliance.name.split('-')[0][target_change.appliance.name.split('-')[0].length - 1]).toLowerCase();
         if(last_char != 'a' && last_char != 'b') { return pass; }
 
         var rest_of_name = String(target_change.appliance.name).slice(0, -1);
@@ -287,7 +287,7 @@ ACSRules.prototype = {
         // within this many ms of each other they are considered to be on
         // the same "day"
         var ms_threshold = s_config.same_day_ms_threshold;
-        var max_changes = s_config.max_acs_changes_per_day;
+        var max_changes = s_config.max_changes_per_day;
 
         var this_day_change_count = 0;
 
@@ -316,7 +316,7 @@ ACSRules.prototype = {
 
         if(pass)
         {
-            // ACS changes that have been scheduled prior to this deployment
+            // Other changes that have been scheduled prior to this deployment
             for(j = 0; j < other_existing_changes.length; j++)
             {
                 var difference = self.get_date_ms_difference(other_existing_changes[j].selected_day, possible_day);
@@ -433,7 +433,7 @@ ACSRules.prototype = {
         <sys_created_on>2016-07-26 15:41:26</sys_created_on>
         <sys_customer_update>true</sys_customer_update>
         <sys_id>c2ce74224f3862008ea450ee0310c780</sys_id>
-        <sys_mod_count>54</sys_mod_count>
+        <sys_mod_count>55</sys_mod_count>
         <sys_name>ACSRules</sys_name>
         <sys_package display_value="ACS" source="x_exeg2_acs">58d89c1c13fca200e93cb16f3244b0d7</sys_package>
         <sys_policy>read</sys_policy>
@@ -441,6 +441,6 @@ ACSRules.prototype = {
         <sys_scope display_value="ACS">58d89c1c13fca200e93cb16f3244b0d7</sys_scope>
         <sys_update_name>sys_script_include_c2ce74224f3862008ea450ee0310c780</sys_update_name>
         <sys_updated_by>mcarter</sys_updated_by>
-        <sys_updated_on>2016-09-28 19:01:05</sys_updated_on>
+        <sys_updated_on>2016-10-27 14:24:14</sys_updated_on>
     </sys_script_include>
 </record_update>

@@ -239,6 +239,7 @@ ACSChangeInstance.prototype = {
         var substitutions = {
             '__CHG_NUMBER__': gr.number,
             '__VERSION__': template_version,
+            '__HOSTNAME__': this.appliance.name,
             '__FH_NAME__': this.deployment.name
         };
         templater.apply_template(gr, template_id, substitutions);
@@ -264,6 +265,29 @@ ACSChangeInstance.prototype = {
         if(validation != '')
         {
             gr.u_validation_plan = validation;
+        }
+
+        if(meta.deployment_category != 'Feed Handler')
+        {
+            // Add to the description
+            for(i = 0; i < meta.items.length; i++)
+            {
+                if(i === 0) { gr.description += '<br/>' };
+                var di = meta.items[i];
+
+                if(di.type == "immutable")
+                {
+                    gr.description += '<br/>'+di.type +' = '+ di.value;
+                }
+                else if(di.type != "config_changes_description")
+                {
+                    gr.description += '<br/>'+di.name +' = '+ di.value;
+                }
+                else
+                {
+                    gr.description += '<br/>config changes needed';
+                }
+            }
         }
 
         // Update now that we have applied the template
@@ -939,7 +963,7 @@ ACSChangeInstance.prototype = {
         <sys_created_on>2016-07-26 15:29:44</sys_created_on>
         <sys_customer_update>true</sys_customer_update>
         <sys_id>7c6c34ee4ff462008ea450ee0310c755</sys_id>
-        <sys_mod_count>202</sys_mod_count>
+        <sys_mod_count>206</sys_mod_count>
         <sys_name>ACSChangeInstance</sys_name>
         <sys_package display_value="ACS" source="x_exeg2_acs">58d89c1c13fca200e93cb16f3244b0d7</sys_package>
         <sys_policy>read</sys_policy>
@@ -947,6 +971,6 @@ ACSChangeInstance.prototype = {
         <sys_scope display_value="ACS">58d89c1c13fca200e93cb16f3244b0d7</sys_scope>
         <sys_update_name>sys_script_include_7c6c34ee4ff462008ea450ee0310c755</sys_update_name>
         <sys_updated_by>mcarter</sys_updated_by>
-        <sys_updated_on>2016-10-25 15:55:23</sys_updated_on>
+        <sys_updated_on>2016-10-27 18:05:46</sys_updated_on>
     </sys_script_include>
 </record_update>
