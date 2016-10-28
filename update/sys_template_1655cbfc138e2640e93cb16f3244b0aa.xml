@@ -17,7 +17,7 @@
         <sys_created_on>2016-09-21 18:18:02</sys_created_on>
         <sys_customer_update>true</sys_customer_update>
         <sys_id>1655cbfc138e2640e93cb16f3244b0aa</sys_id>
-        <sys_mod_count>5</sys_mod_count>
+        <sys_mod_count>7</sys_mod_count>
         <sys_name>acs_fw_upgrade</sys_name>
         <sys_package display_value="ACS" source="x_exeg2_acs">58d89c1c13fca200e93cb16f3244b0d7</sys_package>
         <sys_policy/>
@@ -25,7 +25,7 @@
         <sys_scope display_value="ACS">58d89c1c13fca200e93cb16f3244b0d7</sys_scope>
         <sys_update_name>sys_template_1655cbfc138e2640e93cb16f3244b0aa</sys_update_name>
         <sys_updated_by>mcarter</sys_updated_by>
-        <sys_updated_on>2016-10-27 18:06:41</sys_updated_on>
+        <sys_updated_on>2016-10-28 13:33:39</sys_updated_on>
         <table>change_request</table>
         <template>change_plan=# Run pre-change snapshots:&#13;
 &#13;
@@ -35,7 +35,7 @@
 &#13;
 # Verify commit has made it to the system:&#13;
 &#13;
-cd /usr/local/exegy/puppet/data ; git describe --all __COMMIT__&#13;
+cd /usr/local/exegy/puppet/data ; git pull ; git describe --all __COMMIT__&#13;
 &#13;
 # Stop exelerate:&#13;
 &#13;
@@ -52,7 +52,7 @@ xpuppet -p&#13;
 &#13;
 # Start exelerate:&#13;
 &#13;
-estart^backout_plan=Escalate to MSE^u_acs_ref=^short_description=ACS change for upgrading to firmware version: __VERSION__^u_business_objective=To update to firmware version __VERSION__^assignment_group=0148f7bb6fb7a100b13653a11c3ee41d^u_category=1daa2f626f3835005318eef11c3ee4e7^state=13^reason=^description=ACS change for firmware __VERSION__^u_expedited=false^u_expedite_justification=^u_workflow_state=^approval=requested^EQ</template>
+estart^backout_plan=Escalate to MSE^u_acs_ref=^short_description=ACS change for upgrading to firmware version: __VERSION__^u_business_objective=To update to firmware version __VERSION__^assignment_group=0148f7bb6fb7a100b13653a11c3ee41d^u_category=1daa2f626f3835005318eef11c3ee4e7^state=13^reason=^description=ACS change for firmware __VERSION__^u_expedited=false^u_expedite_justification=^u_workflow_state=^EQ</template>
         <user display_value="Matthew Carter (mcarter)">3e2683fc6fd6650059d4a14d5d3ee4db</user>
         <view/>
     </sys_template>

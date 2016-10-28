@@ -187,6 +187,8 @@ ACSChangeInstance.prototype = {
         meta.deployment_category = String(this.deployment.category);
         meta.items = [];
 
+        var fh_version_no_fw = this.deployment.version;
+
         if(meta.deployment_category == 'Firmware')
         {
             // If we are a firmware version and we are an edge cache make sure
@@ -200,6 +202,15 @@ ACSChangeInstance.prototype = {
                         template_version = this.deployment.deployment_items[i].value;
                     }
                 }
+            }
+        }
+        else if(meta.deployment_category == 'Feed Handler')
+        {
+            fh_version_no_fw = fh_version_no_fw.replace('/', '.');
+            var split = fh_version_no_fw.split('.');
+            if(split.length == 5)
+            {
+                fh_version_no_fw = split[2] +'.'+ split[3] +'.'+ split[4];
             }
         }
 
@@ -240,7 +251,8 @@ ACSChangeInstance.prototype = {
             '__CHG_NUMBER__': gr.number,
             '__VERSION__': template_version,
             '__HOSTNAME__': this.appliance.name,
-            '__FH_NAME__': this.deployment.name
+            '__FH_NAME__': this.deployment.name,
+            '__VERSION_NO_FW__': fh_version_no_fw
         };
         templater.apply_template(gr, template_id, substitutions);
 
@@ -269,6 +281,8 @@ ACSChangeInstance.prototype = {
 
         if(meta.deployment_category != 'Feed Handler')
         {
+            var config_changes_to_describe = null;
+
             // Add to the description
             for(i = 0; i < meta.items.length; i++)
             {
@@ -285,8 +299,14 @@ ACSChangeInstance.prototype = {
                 }
                 else
                 {
-                    gr.description += '<br/>config changes needed';
+                    config_changes_to_describe = di.value;
                 }
+            }
+
+            if(config_changes_to_describe != null)
+            {
+                gr.description += '<br/><br/>Config changes are required:<br/>';
+                gr.description += config_changes_to_describe.replace(/\n/gi, '<br/>');
             }
         }
 
@@ -963,7 +983,7 @@ ACSChangeInstance.prototype = {
         <sys_created_on>2016-07-26 15:29:44</sys_created_on>
         <sys_customer_update>true</sys_customer_update>
         <sys_id>7c6c34ee4ff462008ea450ee0310c755</sys_id>
-        <sys_mod_count>206</sys_mod_count>
+        <sys_mod_count>210</sys_mod_count>
         <sys_name>ACSChangeInstance</sys_name>
         <sys_package display_value="ACS" source="x_exeg2_acs">58d89c1c13fca200e93cb16f3244b0d7</sys_package>
         <sys_policy>read</sys_policy>
@@ -971,6 +991,6 @@ ACSChangeInstance.prototype = {
         <sys_scope display_value="ACS">58d89c1c13fca200e93cb16f3244b0d7</sys_scope>
         <sys_update_name>sys_script_include_7c6c34ee4ff462008ea450ee0310c755</sys_update_name>
         <sys_updated_by>mcarter</sys_updated_by>
-        <sys_updated_on>2016-10-27 18:05:46</sys_updated_on>
+        <sys_updated_on>2016-10-28 13:57:06</sys_updated_on>
     </sys_script_include>
 </record_update>
